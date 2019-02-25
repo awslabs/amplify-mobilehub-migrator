@@ -1,0 +1,25 @@
+{
+  "name": "amplify-mobilehub",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Info: no test specified, beta version\""
+  },
+  "dependencies": {
+    "amplify-frontend-android": "^1.0.5",
+    "amplify-frontend-ios": "^1.0.5",
+    "amplify-frontend-javascript": "^1.0.5",
+    "amplify-provider-awscloudformation": "^1.0.8",
+    "fs-extra": "^7.0.0",
+    "ora": "^3.0.0",
+    "aws-sdk": "2.410.0"
+  },
+  "author": "Amazon Web Services",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "eslint": "^5.14.1",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-plugin-import": "^2.16.0"
+  }
+}
