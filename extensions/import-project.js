@@ -165,7 +165,7 @@ async function createTables(featureResult, config, context) {
         },
       };
       // eslint-disable-next-line max-len
-      const tableDetails = await context.getDynamoDbDetails(context, { region: featureResult.region }, tableName);
+      const tableDetails = await context.getDynamoDbDetails({ region: featureResult.region }, tableName);
       const partitionKey = tableDetails.Table.KeySchema
         .find(item => item.KeyType === 'HASH').AttributeName;
       const partitionKeyType = tableDetails.Table.AttributeDefinitions
@@ -217,7 +217,7 @@ async function createApi(featureResult, config, context) {
     config.function = {};
     const functionPromises = functions.map(async (element) => {
       // eslint-disable-next-line max-len
-      const functionDetails = await context.getLambdaFunctionDetails(context, { region: featureResult.region }, element.name);
+      const functionDetails = await context.getLambdaFunctionDetails({ region: featureResult.region }, element.name);
       if (!element.attributes.status.includes('DELETE_SKIPPED')) {
         config.function[`${element.name}`] = {
           service: 'Lambda',
@@ -295,19 +295,19 @@ async function createNotificationsOutput(featureResult, channels, context) {
   };
   if (channels.GCM) {
     output.FCM = {};
-    output.FCM = await context.getPinpointChannelDetail(context, { region: featureResult.region }, 'GCM', channels.applicationId);
+    output.FCM = await context.getPinpointChannelDetail({ region: featureResult.region }, 'GCM', channels.applicationId);
   }
   if (channels.SMS) {
     output.SMS = {};
-    output.SMS = await context.getPinpointChannelDetail(context, { region: featureResult.region }, 'SMS', channels.applicationId);
+    output.SMS = await context.getPinpointChannelDetail({ region: featureResult.region }, 'SMS', channels.applicationId);
   }
   if (channels.Email) {
     output.Email = {};
-    output.Email = await context.getPinpointChannelDetail(context, { region: featureResult.region }, 'Email', channels.applicationId);
+    output.Email = await context.getPinpointChannelDetail({ region: featureResult.region }, 'Email', channels.applicationId);
   }
   if (channels.APNS) {
     output.APNS = {};
-    output.APNS = await context.getPinpointChannelDetail(context, { region: featureResult.region }, 'APNS', channels.applicationId);
+    output.APNS = await context.getPinpointChannelDetail({ region: featureResult.region }, 'APNS', channels.applicationId);
   }
   return output;
 }

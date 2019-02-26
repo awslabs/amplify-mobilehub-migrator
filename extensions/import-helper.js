@@ -1,5 +1,4 @@
-const aws = require('aws-sdk');
-const awsConfigurationManager = require('amplify-provider-awscloudformation');
+const { getConfiguredAWSClient } = require('amplify-provider-awscloudformation');
 
 module.exports = (context) => {
   context.getLambdaFunctionDetails = async (options, name) => {
@@ -7,6 +6,7 @@ module.exports = (context) => {
     if (options.region) {
       awsOptions.region = options.region;
     }
+    
     const lambda = await getConfiguredLambdaClient(context, awsOptions);
     const result = await lambda.getFunction({ FunctionName: name }).promise();
     return result;
@@ -41,17 +41,17 @@ module.exports = (context) => {
   };
 };
 async function getConfiguredLambdaClient(context, awsOptions) {
-  await awsConfigurationManager.loadConfiguration(context, aws);
-  aws.config.update(awsOptions);
-  return new aws.Lambda();
+  const awsClient = await getConfiguredAWSClient(context);
+  awsClient.config.update(awsOptions);
+  return new awsClient.Lambda();
 }
 async function getConfiguredDynamoDbClient(context, awsOptions) {
-  await awsConfigurationManager.loadConfiguration(context, aws);
-  aws.config.update(awsOptions);
-  return new aws.DynamoDB();
+  const awsClient = await getConfiguredAWSClient(context);
+  awsClient.config.update(awsOptions);
+  return new awsClient.DynamoDB();
 }
 async function getConfiguredPinpointClient(context, awsOptions) {
-  await awsConfigurationManager.loadConfiguration(context, aws);
-  aws.config.update(awsOptions);
-  return new aws.Pinpoint();
+  const awsClient = await getConfiguredAWSClient(context);
+  awsClient.config.update(awsOptions);
+  return new awsClient.Pinpoint();
 }

@@ -6,7 +6,6 @@ module.exports = (context) => {
   // eslint-disable-next-line no-shadow
   context.aws.configureWithCreds = context => awsConfigurator.configure.loadConfiguration(context, aws);
 };
-//aws.configureWithCreds = context => awsConfigurator.configure.loadConfiguration(context, aws);
 
 
 module.exports = aws;
