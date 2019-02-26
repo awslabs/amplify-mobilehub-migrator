@@ -1,7 +1,7 @@
 {
   "name": "amplify-mobilehub-migrator",
   "version": "1.0.0",
-  "description": "",
+  "description": "A plugin for the AWS Amplify CLI that supports migrating Mobile Hub project resources to be used with the Amplify CLI",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Info: no test specified, beta version\""
