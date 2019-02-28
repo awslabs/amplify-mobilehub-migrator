@@ -204,13 +204,17 @@ async function createApi(featureResult, config, context) {
 
   if (hasApi) {
     config.api = {};
+    // eslint-disable-next-line dot-notation
+    const physicalId = featureResult.find(item => item.type === 'AWS::ApiGateway::RestApi').attributes['cfPhysicalID'];
+    // eslint-disable-next-line prefer-destructuring
+    const region = featureResult.find(item => item.type === 'AWS::ApiGateway::RestApi').attributes['region'];
     config.api[`api${new Date().getMilliseconds()}`] = {
       service: 'API Gateway',
       providerPlugin: 'awscloudformation',
       lastPushTimeStamp: new Date().toISOString(),
       output: {
         ApiName: featureResult.find(item => item.type === 'AWS::ApiGateway::RestApi').name,
-        RootUrl: '', // TODO
+        RootUrl: `https://${physicalId}.execute-api.${region}.amazonaws.com/Development`,
       },
     };
   }
