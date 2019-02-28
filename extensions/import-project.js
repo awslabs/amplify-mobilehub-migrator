@@ -1,3 +1,5 @@
+// Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 const fs = require('fs-extra');
 const ora = require('ora');
 const Mobile = require('../extensions/aws-utils/aws-mobilehub');
