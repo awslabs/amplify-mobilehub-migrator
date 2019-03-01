@@ -2,12 +2,9 @@
   "name": "amplify-mobilehub-migrator",
   "version": "1.0.0",
   "description": "A plugin for the AWS Amplify CLI that supports migrating Mobile Hub project resources to be used with the Amplify CLI",
-  "scripts": {
-    "test": "echo \"Info: no test specified, beta version\""
-  },
   "author": "Amazon Web Services",
   "license": "Apache-2.0",
-
+  "main": "index.js",
   "keywords": [
     "mobilehub",
     "amplify",
@@ -22,10 +19,18 @@
     "ora": "^3.0.0",
     "aws-sdk": "2.410.0"
   },
-  
+  "private": true,
   "devDependencies": {
     "eslint": "^5.14.1",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/awslabs/amplify-mobilehub-migrator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/awslabs/amplify-mobilehub-migrator/issues"
+  },
+  "homepage": "https://github.com/awslabs/amplify-mobilehub-migrator#readme"
 }
