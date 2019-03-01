@@ -27,7 +27,7 @@ module.exports = (context) => {
 
         const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
         frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context));
-        spinner.succeed('Importing your project was successfully.');
+        spinner.succeed('Importing your project was successful.');
       } catch (error) {
         spinner.fail(`There was an error importing your project: ${error.message}`);
         throw error;
