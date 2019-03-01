@@ -19,7 +19,6 @@
     "ora": "^3.0.0",
     "aws-sdk": "2.410.0"
   },
-  "private": true,
   "devDependencies": {
     "eslint": "^5.14.1",
     "eslint-config-airbnb-base": "^13.1.0",
