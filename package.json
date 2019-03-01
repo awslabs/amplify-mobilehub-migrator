@@ -15,9 +15,9 @@
     "amplify-frontend-ios": "^1.0.5",
     "amplify-frontend-javascript": "^1.0.5",
     "amplify-provider-awscloudformation": "^1.0.8",
+    "aws-sdk": "2.410.0",
     "fs-extra": "^7.0.0",
-    "ora": "^3.0.0",
-    "aws-sdk": "2.410.0"
+    "ora": "^3.0.0"
   },
   "devDependencies": {
     "eslint": "^5.14.1",
