@@ -8,7 +8,7 @@ module.exports = (context) => {
     if (options.region) {
       awsOptions.region = options.region;
     }
-    
+
     const lambda = await getConfiguredLambdaClient(context, awsOptions);
     const result = await lambda.getFunction({ FunctionName: name }).promise();
     return result;

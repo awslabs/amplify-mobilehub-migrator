@@ -1,13 +1,13 @@
-# Mobile Hub to Amplify CLI Migrator
-A plugin for the AWS Amplify CLI that supports migrating Mobile Hub project resources to be used with the Amplify CLI.
+## Amplify Mobilehub Migrator
+A plugin to migrate existing Mobile Hub projects to be used with the Amplify CLI
 
-- [Mobile Hub to Amplify CLI Migrator](#mobile-hub-to-amplify-cli-migrator)
-  - [Installation Guide](#installation-guide)
-    - [Installing via NPM (Recommended)](#installing-via-npm-recommended)
-    - [Installing Manually](#installing-manually)
-  - [Usage](#usage)
-  - [Notes](#notes)
-  - [License](#license)
+- [Amplify Mobilehub Migrator](#amplify-mobilehub-migrator)
+- [Installation Guide](#installation-guide)
+  - [Installing via NPM (Recommended)](#installing-via-npm-recommended)
+  - [Installing Manually](#installing-manually)
+- [Usage](#usage)
+- [Notes](#notes)
+- [License](#license)
 
 
 ## Installation Guide
@@ -51,4 +51,3 @@ amplify mobilehub import <projectId>
 ## License
 
 This library is licensed under the Apache 2.0 License.
-  
