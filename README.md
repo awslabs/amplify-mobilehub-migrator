@@ -18,7 +18,7 @@ After installing the official CLI you now have to install this plugin on your lo
 
 ### Installing via NPM (Recommended) 
 ```
-npm install -g amplify-mobilehub-migrator
+npm i -g @aws-amplify-console/amplify-mobilehub-migrator
 ```
 
 ### Installing Manually
