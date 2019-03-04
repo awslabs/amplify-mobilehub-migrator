@@ -18,5 +18,9 @@ class Mobile {
     };
     return this.mobile.describeProject(params).promise().then((result => result));
   }
+  
+  listProjects() {
+    return this.mobile.listProjects().promise();
+  }
 }
 module.exports = Mobile;

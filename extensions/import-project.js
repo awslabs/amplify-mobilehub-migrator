@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 const fs = require('fs-extra');
 const ora = require('ora');
+const inquirer = require("inquirer");
 const Mobile = require('../extensions/aws-utils/aws-mobilehub');
 
 const spinner = ora('');
@@ -11,29 +12,45 @@ module.exports = (context) => {
     const frontendPlugins = context.amplify.getFrontendPlugins(context);
     const projectConfigFilePath = context.amplify.pathManager.getProjectConfigFilePath();
     const projectConfig = JSON.parse(fs.readFileSync(projectConfigFilePath));
-
-    if (context.parameters.first) {
-      const projectId = context.parameters.first;
-      try {
-        const providerInfoConfig = context.amplify.pathManager.getProviderInfoFilePath();
-        const providerInfo = JSON.parse(fs.readFileSync(providerInfoConfig));
-        if (Object.keys(providerInfo).length > 1) {
-          context.print.error('Importing a mobile hub project into an amplify project, with multiple environments is currently not supported.');
+    let projectId;
+    if (!context.parameters.first) {
+        const mobileHub = await new Mobile(context);
+        const result = await mobileHub.listProjects();
+        if (result.projects.length === 0) {
+          context.print.error("You don't have any mobilehub projects.");
           return;
         }
-        spinner.start('Importing your project');
-        const mobileHubResources = await getMobileResources(projectId, context);
-        await persistResourcesToConfig(mobileHubResources, context);
-
-        const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
-        frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context));
-        spinner.succeed('Importing your project was successful.');
-      } catch (error) {
-        spinner.fail(`There was an error importing your project: ${error.message}`);
-        throw error;
-      }
+        const choices = result.projects.map((project) => ({
+          name: project.name,
+          value: project.projectId
+        }));
+        const answer = await inquirer.prompt([{
+          type: 'list',
+          name: 'projectId',
+          message: 'Select the project to import from the list',
+          choices
+        }]);
+        projectId = answer.projectId;
     } else {
-      context.print.error('Something went wrong. You did not specify a project id. Try this format \' amplify mobilehub import [PROJECT-ID] \'');
+      projectId = context.parameters.first;
+    }
+    try {
+      const providerInfoConfig = context.amplify.pathManager.getProviderInfoFilePath();
+      const providerInfo = JSON.parse(fs.readFileSync(providerInfoConfig));
+      if (Object.keys(providerInfo).length > 1) {
+        context.print.error('Importing a mobile hub project into an amplify project, with multiple environments is currently not supported.');
+        return;
+      }
+      spinner.start('Importing your project');
+      const mobileHubResources = await getMobileResources(projectId, context);
+      await persistResourcesToConfig(mobileHubResources, context);
+
+      const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
+      frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context));
+      spinner.succeed('Importing your project was successful.');
+    } catch (error) {
+      spinner.fail(`There was an error importing your project: ${error.message}`);
+      throw error;
     }
   };
 };
