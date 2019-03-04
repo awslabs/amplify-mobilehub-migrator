@@ -17,7 +17,7 @@ module.exports = (context) => {
         const mobileHub = await new Mobile(context);
         const result = await mobileHub.listProjects();
         if (result.projects.length === 0) {
-          context.print.error("You don't have any mobilehub projects.");
+          context.print.error("Nothing to import, you don't have any MobileHub project.");
           return;
         }
         const choices = result.projects.map((project) => ({
@@ -27,7 +27,7 @@ module.exports = (context) => {
         const answer = await inquirer.prompt([{
           type: 'list',
           name: 'projectId',
-          message: 'Select the project to import from the list',
+          message: 'Select the project to import',
           choices
         }]);
         projectId = answer.projectId;
