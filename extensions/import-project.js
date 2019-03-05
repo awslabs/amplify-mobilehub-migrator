@@ -44,9 +44,9 @@ module.exports = (context) => {
       spinner.start('Importing your project');
       const mobileHubResources = await getMobileResources(projectId, context);
       await persistResourcesToConfig(mobileHubResources, context);
-
       const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
       frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context));
+      await context.updateRegion(frontendHandlerModule);
       spinner.succeed('Your Mobile Hub project was successfully imported.');
     } catch (error) {
       spinner.fail(`There was an error importing your Mobile Hub project: ${error.message}`);

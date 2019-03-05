@@ -7,7 +7,7 @@ class Mobile {
     return aws.configureWithCreds(context)
       .then((awsItem) => {
         this.context = context;
-        this.mobile = new awsItem.Mobile({region: 'us-east-1'});
+        this.mobile = new awsItem.Mobile({ region: 'us-east-1' });
         return this;
       });
   }
