@@ -7,6 +7,9 @@ class Mobile {
     return aws.configureWithCreds(context)
       .then((awsItem) => {
         this.context = context;
+        awsItem.config.update({
+          region: "us-east-1"
+        });
         this.mobile = new awsItem.Mobile();
         return this;
       });
@@ -17,6 +20,10 @@ class Mobile {
       projectId,
     };
     return this.mobile.describeProject(params).promise().then((result => result));
+  }
+  
+  listProjects() {
+    return this.mobile.listProjects().promise();
   }
 }
 module.exports = Mobile;
