@@ -43,13 +43,13 @@ module.exports = (context) => {
 };
 async function getConfiguredLambdaClient(context, awsOptions) {
   const awsClient = await getConfiguredAWSClient(context);
-  return new awsClient.Lambda({region: awsOptions.region});
+  return new awsClient.Lambda({ region: awsOptions.region });
 }
 async function getConfiguredDynamoDbClient(context, awsOptions) {
   const awsClient = await getConfiguredAWSClient(context);
-  return new awsClient.DynamoDB({region: awsOptions.region});
+  return new awsClient.DynamoDB({ region: awsOptions.region });
 }
 async function getConfiguredPinpointClient(context, awsOptions) {
   const awsClient = await getConfiguredAWSClient(context);
-  return new awsClient.Pinpoint({region: awsOptions.region});
+  return new awsClient.Pinpoint({ region: awsOptions.region });
 }
