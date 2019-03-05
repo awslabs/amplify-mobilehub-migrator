@@ -18,11 +18,6 @@ module.exports = (context) => {
       }
     }
   };
-  context.getExportFilePath = (frontendModule) => {
-    const exportsFilePath = getFilePath(context, frontendModule);
-    const fileStats = fs.stat(exportsFilePath);
-    return fileStats.mtime;
-  };
 };
 
 function updateCognitoRegion(configuration, searchKey) {
