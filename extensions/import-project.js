@@ -21,7 +21,7 @@ module.exports = (context) => {
           return;
         }
         const choices = result.projects.map((project) => ({
-          name: project.name,
+          name: `${project.name} (${project.projectId})`,
           value: project.projectId
         }));
         const answer = await inquirer.prompt([{
