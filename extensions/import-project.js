@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 const fs = require('fs-extra');
 const ora = require('ora');
-const inquirer = require("inquirer");
+const inquirer = require('inquirer');
 const Mobile = require('../extensions/aws-utils/aws-mobilehub');
 
 const spinner = ora('');
@@ -14,23 +14,23 @@ module.exports = (context) => {
     const projectConfig = JSON.parse(fs.readFileSync(projectConfigFilePath));
     let projectId;
     if (!context.parameters.first) {
-        const mobileHub = await new Mobile(context);
-        const result = await mobileHub.listProjects();
-        if (result.projects.length === 0) {
-          context.print.error("Nothing to import, you don't have any MobileHub project.");
-          return;
-        }
-        const choices = result.projects.map((project) => ({
-          name: `${project.name} (${project.projectId})`,
-          value: project.projectId
-        }));
-        const answer = await inquirer.prompt([{
-          type: 'list',
-          name: 'projectId',
-          message: 'Select the project to import',
-          choices
-        }]);
-        projectId = answer.projectId;
+      const mobileHub = await new Mobile(context);
+      const result = await mobileHub.listProjects();
+      if (result.projects.length === 0) {
+        context.print.error("Nothing to import, you don't have any MobileHub project.");
+        return;
+      }
+      const choices = result.projects.map(project => ({
+        name: `${project.name} (${project.projectId})`,
+        value: project.projectId,
+      }));
+      const answer = await inquirer.prompt([{
+        type: 'list',
+        name: 'projectId',
+        message: 'Select the project to import',
+        choices,
+      }]);
+      projectId = answer.projectId;
     } else {
       projectId = context.parameters.first;
     }

@@ -8,7 +8,7 @@ class Mobile {
       .then((awsItem) => {
         this.context = context;
         awsItem.config.update({
-          region: "us-east-1"
+          region: 'us-east-1',
         });
         this.mobile = new awsItem.Mobile();
         return this;
@@ -21,7 +21,7 @@ class Mobile {
     };
     return this.mobile.describeProject(params).promise().then((result => result));
   }
-  
+
   listProjects() {
     return this.mobile.listProjects().promise();
   }
