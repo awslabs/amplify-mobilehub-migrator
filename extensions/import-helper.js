@@ -8,7 +8,6 @@ module.exports = (context) => {
     if (options.region) {
       awsOptions.region = options.region;
     }
-
     const lambda = await getConfiguredLambdaClient(context, awsOptions);
     const result = await lambda.getFunction({ FunctionName: name }).promise();
     return result;
@@ -44,16 +43,13 @@ module.exports = (context) => {
 };
 async function getConfiguredLambdaClient(context, awsOptions) {
   const awsClient = await getConfiguredAWSClient(context);
-  awsClient.config.update(awsOptions);
-  return new awsClient.Lambda();
+  return new awsClient.Lambda({region: awsOptions.region});
 }
 async function getConfiguredDynamoDbClient(context, awsOptions) {
   const awsClient = await getConfiguredAWSClient(context);
-  awsClient.config.update(awsOptions);
-  return new awsClient.DynamoDB();
+  return new awsClient.DynamoDB({region: awsOptions.region});
 }
 async function getConfiguredPinpointClient(context, awsOptions) {
   const awsClient = await getConfiguredAWSClient(context);
-  awsClient.config.update(awsOptions);
-  return new awsClient.Pinpoint();
+  return new awsClient.Pinpoint({region: awsOptions.region});
 }
