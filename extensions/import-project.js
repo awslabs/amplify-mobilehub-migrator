@@ -192,7 +192,7 @@ async function createTables(featureResult, config, context) {
 }
 
 function createHosting(featureResult, config) {
-  const hasHosting = featureResult.find(item => item.type === 'AWS::S3::Bucket');
+  const hasHosting = featureResult.find(item => item.type === 'AWS::S3::Bucket' && item.feature === 'hosting');
   if (hasHosting) {
     config.hosting = {};
     config.hosting.S3AndCloudFront = {
