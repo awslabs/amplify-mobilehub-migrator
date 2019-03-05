@@ -38,7 +38,7 @@ module.exports = (context) => {
       const providerInfoConfig = context.amplify.pathManager.getProviderInfoFilePath();
       const providerInfo = JSON.parse(fs.readFileSync(providerInfoConfig));
       if (Object.keys(providerInfo).length > 1) {
-        context.print.error('Importing a mobile hub project into an amplify project, with multiple environments is currently not supported.');
+        context.print.error('Importing a mobile hub project into an amplify project with multiple environments is currently not supported.');
         return;
       }
       spinner.start('Importing your project');
@@ -47,9 +47,9 @@ module.exports = (context) => {
 
       const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
       frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context));
-      spinner.succeed('Importing your project was successful.');
+      spinner.succeed('Your Mobile Hub project was successfully imported.');
     } catch (error) {
-      spinner.fail(`There was an error importing your project: ${error.message}`);
+      spinner.fail(`There was an error importing your Mobile Hub project: ${error.message}`);
       throw error;
     }
   };
@@ -167,27 +167,26 @@ async function createTables(featureResult, config, context) {
   if (hasDynamoDb) {
     if (!config.storage) {
       config.storage = {};
-    } else {
-      const tableName = featureResult.find(item => item.type === 'AWS::DynamoDB::Table').name;
-      const serviceName = `dynamo${new Date().getMilliseconds()}`;
-      config.storage[serviceName] = {
-        service: 'DynamoDb',
-        lastPushTimeStamp: new Date().toISOString(),
-        output: {
-          Region: featureResult.region,
-          Arn: featureResult.find(item => item.type === 'AWS::DynamoDB::Table').arn,
-          Name: tableName,
-        },
-      };
-      // eslint-disable-next-line max-len
-      const tableDetails = await context.getDynamoDbDetails({ region: featureResult.region }, tableName);
-      const partitionKey = tableDetails.Table.KeySchema
-        .find(item => item.KeyType === 'HASH').AttributeName;
-      const partitionKeyType = tableDetails.Table.AttributeDefinitions
-        .find(item => item.AttributeName === partitionKey).AttributeType;
-      config.storage[serviceName].output.PartitionKeyName = partitionKey;
-      config.storage[serviceName].output.PartitionKeyType = partitionKeyType;
     }
+    const tableName = featureResult.find(item => item.type === 'AWS::DynamoDB::Table').name;
+    const serviceName = `dynamo${new Date().getMilliseconds()}`;
+    config.storage[serviceName] = {
+      service: 'DynamoDb',
+      lastPushTimeStamp: new Date().toISOString(),
+      output: {
+        Region: featureResult.region,
+        Arn: featureResult.find(item => item.type === 'AWS::DynamoDB::Table').arn,
+        Name: tableName,
+      },
+    };
+    // eslint-disable-next-line max-len
+    const tableDetails = await context.getDynamoDbDetails({ region: featureResult.region }, tableName);
+    const partitionKey = tableDetails.Table.KeySchema
+      .find(item => item.KeyType === 'HASH').AttributeName;
+    const partitionKeyType = tableDetails.Table.AttributeDefinitions
+      .find(item => item.AttributeName === partitionKey).AttributeType;
+    config.storage[serviceName].output.PartitionKeyName = partitionKey;
+    config.storage[serviceName].output.PartitionKeyType = partitionKeyType;
   }
   return config;
 }
