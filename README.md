@@ -1,10 +1,12 @@
 # Amplify Mobilehub Migrator
 
 A plugin to migrate existing AWS Mobile Hub projects to be used with the Amplify CLI. With this plugin, you will be able to:
+
 1. Re-use resources created by Mobile Hub in the Amplify CLI
 2. Leverage Amplify CLI functionality such as GraphQL APIs (provisioned by AWS AppSync), [GraphQL transform](https://aws-amplify.github.io/docs/cli/graphql), and the [Codegen](https://aws-amplify.github.io/docs/cli/codegen) functionality.
 
 You will not be able to:
+
 1. Use the CLI's [multi-environment](https://aws-amplify.github.io/docs/cli/multienv) feature with migrated Mobile Hub projects.
 2. Import Mobile Hub projects into existing Amplify projects that are already using the multi-env feature.
 
