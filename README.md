@@ -1,4 +1,4 @@
-# Amplify Mobilehub Migrator
+# AWS Mobile Hub &rarr; Amplify CLI Migrator
 
 A plugin to migrate existing AWS Mobile Hub projects to be used with the Amplify CLI. With this plugin, you will be able to:
 1. Re-use resources created by Mobile Hub in the Amplify CLI (compatiible with Amplify CLI `version >= 1.1.7`)
