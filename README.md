@@ -17,13 +17,13 @@ You will not be able to:
 
 ## Installation Guide
 
-To get started, make sure you've installed the Amplify CLI.
+To get started, make sure you've installed the Amplify CLI. Please refer to the getting started guide on [GitHub](https://github.com/aws-amplify/amplify-cli).
 
 ```bash
 npm install -g @aws-amplify/cli
 ```
 
-Please refer to the getting started guide on [GitHub](https://github.com/aws-amplify/amplify-cli). After installing the official CLI you now have to install this plugin on your local machine. 
+After installing the official CLI you now have to install this plugin on your local machine. 
 
 ```bash
 npm i -g amplify-mobilehub-migrator
