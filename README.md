@@ -9,11 +9,10 @@ You will not be able to:
 1. Use the CLI's [multi-environment](https://aws-amplify.github.io/docs/cli/multienv) feature with migrated Mobile Hub projects.
 2. Import Mobile Hub projects into existing Amplify projects that are already using the multi-env feature.
 
-- [Amplify Mobilehub Migrator](#amplify-mobilehub-migrator)
-  - [Installation Guide](#installation-guide)
-  - [Usage](#usage)
-  - [Notes](#notes)
-  - [License](#license)
+- [Installation Guide](#installation-guide)
+- [Usage](#usage)
+- [Notes](#notes)
+- [License](#license)
 
 ## Installation Guide
 
