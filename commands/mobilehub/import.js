@@ -6,7 +6,7 @@ module.exports = {
     try {
       await context.importProject(context);
     } catch (e) {
-      context.print.error(`An error occured trying to run the command ${e.message}`);
+      context.print.error(`An error occured trying to run the command ${e}`);
     }
   },
 };
