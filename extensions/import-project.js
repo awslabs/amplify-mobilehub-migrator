@@ -50,7 +50,7 @@ module.exports = (context) => {
       context.updateRegion(frontendHandlerModule);
       spinner.succeed('Your Mobile Hub project was successfully imported.');
     } catch (error) {
-      spinner.fail(`There was an error importing your Mobile Hub project: ${error.message}`);
+      spinner.fail(`There was an error importing your Mobile Hub project: ${error}`);
       throw error;
     }
   };
@@ -132,17 +132,20 @@ function createAuth(featureResult, config) {
 }
 
 async function createAnalytics(featureResult, config, context) {
-  config.analytics = {};
-  config.analytics[`analytics${new Date().getMilliseconds()}`] = {
-    service: 'Pinpoint',
-    lastPushTimeStamp: new Date().toISOString(),
-    output: {
-      appName: featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').name,
-      Region: featureResult.region,
-      Id: featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').arn,
-    },
-  };
-  config = await createNotifications(featureResult, config, context);
+  const hasAnalytics = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication');
+  if (hasAnalytics) {
+    config.analytics = {};
+    config.analytics[`analytics${new Date().getMilliseconds()}`] = {
+      service: 'Pinpoint',
+      lastPushTimeStamp: new Date().toISOString(),
+      output: {
+        appName: featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').name,
+        Region: featureResult.region,
+        Id: featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').arn,
+      },
+    };
+    config = await createNotifications(featureResult, config, context);
+  }
   return config;
 }
 
