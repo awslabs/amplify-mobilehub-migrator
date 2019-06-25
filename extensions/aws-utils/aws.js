@@ -5,7 +5,6 @@ const awsConfigurator = require('amplify-provider-awscloudformation');
 
 module.exports = {
   getConfiguredSDK: async (context) => {
-    context.print.info(context.amplify);
     return await awsConfigurator.getConfiguredAWSClient(context);
   }
 }
