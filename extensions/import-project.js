@@ -14,7 +14,8 @@ module.exports = (context) => {
     const projectConfig = JSON.parse(fs.readFileSync(projectConfigFilePath));
     let projectId;
     if (!context.parameters.first) {
-      const mobileHub = await new Mobile(context);
+      const mobileHub = new Mobile();
+      await mobileHub.init(context);
       const result = await mobileHub.listProjects();
       if (result.projects.length === 0) {
         context.print.error("Nothing to import, you don't have any MobileHub project.");
@@ -56,7 +57,8 @@ module.exports = (context) => {
   };
 };
 async function getMobileResources(projectId, context) {
-  const mobileHub = await new Mobile(context);
+  const mobileHub = new Mobile();
+  await mobileHub.init(context);
   const projectResources = await mobileHub.getProjectResources(projectId);
   const configuration = await createAmplifyMetaConfig(projectResources, context);
   return configuration;
