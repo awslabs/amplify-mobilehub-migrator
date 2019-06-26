@@ -46,7 +46,13 @@ module.exports = (context) => {
       const mobileHubResources = await getMobileResources(projectId, context);
       await persistResourcesToConfig(mobileHubResources, context);
       const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
-      frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context));
+      //Get cloud amplify meta
+      let cloudAmplifyMeta = {};
+      const currentAmplifyMetafilePath = context.amplify.pathManager.getCurentAmplifyMetaFilePath();
+      if (fs.existsSync(currentAmplifyMetafilePath)) {
+        cloudAmplifyMeta = readJsonFile(currentAmplifyMetafilePath);
+      } 
+      frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context), getResourceOutputs(context, cloudAmplifyMeta));
       await persistResourcesToConfig(mobileHubResources, context);
       context.updateRegion(frontendHandlerModule);
       spinner.succeed('Your Mobile Hub project was successfully imported.');
@@ -306,6 +312,18 @@ function hasNotifications(featureResult) {
   || featureResult.find(item => item.type === 'AWS::Pinpoint::APNSChannel')
   );
 }
+
+function stripBOM(content) {
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+  return content;
+}
+
+function readJsonFile(jsonFilePath, encoding = 'utf8') {
+  return JSON.parse(stripBOM(fs.readFileSync(jsonFilePath, encoding)));
+}
+
 async function createNotificationsOutput(featureResult, channels, context) {
   const output = {
     Name: channels.appName,
@@ -360,9 +378,12 @@ function mergeConfig(amplifyMetaConfig, mobilehubResources) {
   return amplifyMetaConfig;
 }
 
-function getResourceOutputs(context) {
-  const amplifyMetaFilePath = context.amplify.pathManager.getAmplifyMetaFilePath();
-  const amplifyMeta = JSON.parse(fs.readFileSync(amplifyMetaFilePath));
+function getResourceOutputs(context, amplifyMeta) {
+  if (!amplifyMeta) {
+    const amplifyMetaFilePath = context.amplify.pathManager.getAmplifyMetaFilePath();
+    amplifyMeta = JSON.parse(fs.readFileSync(amplifyMetaFilePath));
+  }
+
   // Build the provider object
   const outputsByProvider = {};
   const outputsByCategory = {};
