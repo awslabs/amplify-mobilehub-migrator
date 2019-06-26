@@ -3,13 +3,12 @@
 const aws = require('./aws.js');
 
 class Mobile {
-  constructor(context) {
-    return aws.configureWithCreds(context)
-      .then((awsItem) => {
-        this.context = context;
-        this.mobile = new awsItem.Mobile({ region: 'us-east-1' });
-        return this;
-      });
+  
+  async init(context) {
+    const aws_sdk = await aws.getConfiguredSDK(context);
+    const awsItem = await aws_sdk.configureWithCreds(context);
+    this.context = context;
+    this.mobile = new awsItem.Mobile({ region: 'us-east-1' });
   }
 
   getProjectResources(projectId) {
@@ -23,4 +22,5 @@ class Mobile {
     return this.mobile.listProjects().promise();
   }
 }
+
 module.exports = Mobile;
