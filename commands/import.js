@@ -4,16 +4,10 @@ async function run(context) {
   try {
     await context.importProject(context);
   } catch (err) {
-    if (err.name === 'ValidationError') {
-      context.print.error(err.message);
-    } else {
-      throw err;
-    }
+    context.print.error(`An error occured trying to run the command ${err}`);
   }
 }
 
 module.exports = {
   run,
 };
-
-
