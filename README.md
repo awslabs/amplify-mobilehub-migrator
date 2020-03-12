@@ -19,12 +19,13 @@ You will not be able to:
 To get started, make sure you've installed the Amplify CLI. Please refer to the getting started guide on [GitHub](https://github.com/aws-amplify/amplify-cli).
 
 ```bash
-git clone https://github.com/awslabs/amplify-mobilehub-migrator.git
+npm install -g @aws-amplify/cli
 ```
 
 After installing the official CLI you now have to install this plugin on your local machine. 
 
 ```bash
+git clone https://github.com/awslabs/amplify-mobilehub-migrator.git
 cd amplify-mobilehub-migrator && npm install
 amplify plugin add
 ```

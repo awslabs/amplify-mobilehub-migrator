@@ -4,7 +4,7 @@ async function run(context) {
   try {
     await context.importProject(context);
   } catch (err) {
-    context.print.error(`An error occured trying to run the command ${err}`);
+    context.print.error(`An error occurred trying to run the command ${err}`);
   }
 }
 
