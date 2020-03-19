@@ -48,10 +48,10 @@ module.exports = (context) => {
       const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
       //Get cloud amplify meta
       let cloudAmplifyMeta = {};
-      const currentAmplifyMetafilePath = context.amplify.pathManager.getCurentAmplifyMetaFilePath();
+      const currentAmplifyMetafilePath = context.amplify.pathManager.getCurrentAmplifyMetaFilePath();
       if (fs.existsSync(currentAmplifyMetafilePath)) {
         cloudAmplifyMeta = readJsonFile(currentAmplifyMetafilePath);
-      } 
+      }
       frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context), getResourceOutputs(context, cloudAmplifyMeta));
       await persistResourcesToConfig(mobileHubResources, context);
       context.updateRegion(frontendHandlerModule);
@@ -354,7 +354,7 @@ async function persistResourcesToConfig(mobileHubResources, context) {
     const amplifyMetaConfig = getAmplifyMetaConfig(context);
     const mergedBackendConfig = mergeConfig(amplifyMetaConfig, mobileHubResources);
     persistToFile(mergedBackendConfig, context.amplify.pathManager.getAmplifyMetaFilePath());
-    persistToFile(mergedBackendConfig, context.amplify.pathManager.getCurentAmplifyMetaFilePath());
+    persistToFile(mergedBackendConfig, context.amplify.pathManager.getCurrentAmplifyMetaFilePath());
   }
 }
 

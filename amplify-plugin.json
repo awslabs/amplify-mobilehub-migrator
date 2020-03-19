@@ -1,0 +1,8 @@
+{
+    "name": "mobilehub",
+    "type": "category",
+    "commands": [
+        "import"
+    ],
+    "services": ["mobilehub"]
+}

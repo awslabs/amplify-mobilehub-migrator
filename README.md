@@ -25,8 +25,11 @@ npm install -g @aws-amplify/cli
 After installing the official CLI you now have to install this plugin on your local machine. 
 
 ```bash
-npm i -g amplify-mobilehub-migrator
+git clone https://github.com/awslabs/amplify-mobilehub-migrator.git
+cd amplify-mobilehub-migrator && npm install
+amplify plugin add
 ```
+Then simply input absolute directory of root path for amplify-mobilehub-migrator. This will add amplify-mobile-hub-migrator as a plugin to amplify CLI.
 
 
 ## Usage
