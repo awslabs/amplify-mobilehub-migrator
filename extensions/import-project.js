@@ -43,6 +43,7 @@ module.exports = (context) => {
         context.print.error('Importing a mobile hub project into an amplify project with multiple environments is currently not supported.');
         return;
       }
+      
       spinner.start('Importing your project');
       const mobileHubResources = await getMobileResources(projectId, context);
       await persistResourcesToConfig(mobileHubResources, context);
@@ -377,6 +378,8 @@ async function persistResourcesToConfig(mobileHubResources, context) {
     const amplifyMetaConfig = getAmplifyMetaConfig(context);
     const mergedBackendConfig = mergeConfig(amplifyMetaConfig, mobileHubResources);
     persistToFile(mergedBackendConfig, context.amplify.pathManager.getAmplifyMetaFilePath());
+    //persistToFile(mergedBackendConfig,context.amplify.pathManager.getAm)
+    
     persistToFile(mergedBackendConfig, context.amplify.pathManager.getCurrentAmplifyMetaFilePath());
   }
 }
