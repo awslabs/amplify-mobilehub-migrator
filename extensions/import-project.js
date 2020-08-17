@@ -4,6 +4,7 @@ const fs = require('fs-extra');
 const ora = require('ora');
 const inquirer = require('inquirer');
 const Mobile = require('../extensions/aws-utils/aws-mobilehub');
+const S3 = require('../extensions/aws-utils/aws-S3');
 
 const spinner = ora('');
 
@@ -42,6 +43,7 @@ module.exports = (context) => {
         context.print.error('Importing a mobile hub project into an amplify project with multiple environments is currently not supported.');
         return;
       }
+      
       spinner.start('Importing your project');
       const mobileHubResources = await getMobileResources(projectId, context);
       await persistResourcesToConfig(mobileHubResources, context);
@@ -55,6 +57,7 @@ module.exports = (context) => {
       frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context), getResourceOutputs(context, cloudAmplifyMeta));
       await persistResourcesToConfig(mobileHubResources, context);
       context.updateRegion(frontendHandlerModule);
+      await uploadToS3(context);
       spinner.succeed('Your Mobile Hub project was successfully imported.');
     } catch (error) {
       spinner.fail(`There was an error importing your Mobile Hub project: ${error}`);
@@ -62,6 +65,27 @@ module.exports = (context) => {
     }
   };
 };
+
+async function uploadToS3(context)
+{
+  const amplifyMetaConfig= getAmplifyMetaConfig(context);
+  const deploymentBucket = amplifyMetaConfig.providers.awscloudformation.DeploymentBucketName;
+  const s3 = new S3();
+  await s3.init(context);
+  const params = {
+    Bucket: deploymentBucket,
+    Key: 'amplify-meta.json',
+    Body: JSON.stringify(amplifyMetaConfig),
+  };
+  try{
+    const data = await s3.putObject(params);
+    console.log(data);
+  } catch(error)
+  {
+    console.log(error);
+  }
+}
+
 async function getMobileResources(projectId, context) {
   const mobileHub = new Mobile();
   await mobileHub.init(context);
@@ -354,6 +378,8 @@ async function persistResourcesToConfig(mobileHubResources, context) {
     const amplifyMetaConfig = getAmplifyMetaConfig(context);
     const mergedBackendConfig = mergeConfig(amplifyMetaConfig, mobileHubResources);
     persistToFile(mergedBackendConfig, context.amplify.pathManager.getAmplifyMetaFilePath());
+    //persistToFile(mergedBackendConfig,context.amplify.pathManager.getAm)
+    
     persistToFile(mergedBackendConfig, context.amplify.pathManager.getCurrentAmplifyMetaFilePath());
   }
 }
@@ -382,6 +408,7 @@ function getResourceOutputs(context, amplifyMeta) {
   if (!amplifyMeta) {
     const amplifyMetaFilePath = context.amplify.pathManager.getAmplifyMetaFilePath();
     amplifyMeta = JSON.parse(fs.readFileSync(amplifyMetaFilePath));
+
   }
 
   // Build the provider object
