@@ -29,7 +29,8 @@
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
     "mem": ">=4.0.0",
-    "minimist": ">=1.2.2"
+    "minimist": ">=1.2.2",
+    "lodash": ">=4.17.19"
   },
   "repository": {
     "type": "git",
