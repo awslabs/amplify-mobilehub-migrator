@@ -51,7 +51,7 @@ async function importProject(context) {
       return;
     }
     spinner.start('Importing your project');
-    const mobileHubResources = await getMobileResources(projectId, context, configuredAWSClient);
+    const mobileHubResources = await getMobileResources(projectId, configuredAWSClient);
     await persistResourcesToConfig(mobileHubResources, context);
     const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
     // Get cloud amplify meta
@@ -90,17 +90,17 @@ async function uploadToS3(context, configuredAWSClient) {
   }
 }
 
-async function getMobileResources(projectId, context, configuredAWSClient) {
+async function getMobileResources(projectId, configuredAWSClient) {
   const mobileHubClient = new configuredAWSClient.Mobile({ region: 'us-east-1' });
   const params = {
     projectId,
   };
   const projectResources = await mobileHubClient.describeProject(params).promise();
-  const configuration = await createAmplifyMetaConfig(projectResources, context);
+  const configuration = await createAmplifyMetaConfig(projectResources, configuredAWSClient);
   return configuration;
 }
 
-async function createAmplifyMetaConfig(mobileHubResources, context) {
+async function createAmplifyMetaConfig(mobileHubResources, configuredAWSClient) {
   const mobileHubAmplifyMap = {
     'user-signin': 'auth',
     analytics: 'analytics',
@@ -117,7 +117,7 @@ async function createAmplifyMetaConfig(mobileHubResources, context) {
     featureResult.region = mobileHubResources.details.region;
     if (featureResult) {
       // eslint-disable-next-line max-len
-      config = await buildCategory(featureResult, mobileHubAmplifyMap, mobileHubCategory, config, context);
+      config = await buildCategory(featureResult, mobileHubAmplifyMap, mobileHubCategory, config, configuredAWSClient);
     }
   });
   await Promise.all(featurePromises);
@@ -126,21 +126,21 @@ async function createAmplifyMetaConfig(mobileHubResources, context) {
 
 
 // eslint-disable-next-line max-len
-async function buildCategory(featureResult, mobileHubAmplifyMap, mobileHubCategory, config, context) {
+async function buildCategory(featureResult, mobileHubAmplifyMap, mobileHubCategory, config, configuredAWSClient) {
   const amplifyCategory = mobileHubAmplifyMap[mobileHubCategory];
   switch (amplifyCategory) {
     case 'auth':
       return createAuth(featureResult, config);
     case 'analytics':
-      return await createAnalytics(featureResult, config, context);
+      return await createAnalytics(featureResult, config, configuredAWSClient);
     case 'storage':
-      return createStorage(featureResult, config, context);
+      return createStorage(featureResult, config);
     case 'database':
-      return await createTables(featureResult, config, context);
+      return await createTables(featureResult, config, configuredAWSClient);
     case 'api':
-      return await createApi(featureResult, config, context);
+      return await createApi(featureResult, config, configuredAWSClient);
     case 'interactions':
-      return createInteractions(featureResult, config, context);
+      return createInteractions(featureResult, config);
     default:
       return config;
   }
@@ -169,7 +169,7 @@ function createAuth(featureResult, config) {
   return config;
 }
 
-async function createAnalytics(featureResult, config) {
+async function createAnalytics(featureResult, config, configuredAWSClient) {
   const hasAnalytics = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication');
   if (hasAnalytics) {
     config.analytics = {};
@@ -182,7 +182,7 @@ async function createAnalytics(featureResult, config) {
         Id: featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').arn,
       },
     };
-    config = await createNotifications(featureResult, config);
+    config = await createNotifications(featureResult, config, configuredAWSClient);
   }
   return config;
 }
@@ -204,7 +204,7 @@ function createStorage(featureResult, config) {
   return config;
 }
 
-async function createTables(featureResult, config) {
+async function createTables(featureResult, config, configuredAWSClient) {
   const hasDynamoDb = featureResult.find(item => item.type === 'AWS::DynamoDB::Table');
   if (hasDynamoDb) {
     if (!config.storage) {
@@ -222,7 +222,7 @@ async function createTables(featureResult, config) {
       },
     };
     // eslint-disable-next-line max-len
-    const tableDetails = await getDynamoDbDetails({ region: featureResult.region }, tableName);
+    const tableDetails = await getDynamoDbDetails({ region: featureResult.region }, tableName, configuredAWSClient);
     const partitionKey = tableDetails.Table.KeySchema
       .find(item => item.KeyType === 'HASH').AttributeName;
     const partitionKeyType = tableDetails.Table.AttributeDefinitions
@@ -251,7 +251,7 @@ function createHosting(featureResult, config) {
   return config;
 }
 
-async function createApi(featureResult, config) {
+async function createApi(featureResult, config, configuredAWSClient) {
   const hasApi = featureResult.some(item => item.type === 'AWS::ApiGateway::RestApi');
   const hasFunctions = featureResult.some(item => item.type === 'AWS::Lambda::Function');
 
@@ -275,7 +275,7 @@ async function createApi(featureResult, config) {
     config.function = {};
     const functionPromises = functions.map(async (element) => {
       // eslint-disable-next-line max-len
-      const functionDetails = await getLambdaFunctionDetails({ region: featureResult.region }, element.name);
+      const functionDetails = await getLambdaFunctionDetails({ region: featureResult.region }, element.name, configuredAWSClient);
       if (!element.attributes.status.includes('DELETE_SKIPPED')) {
         config.function[`${element.name}`] = {
           service: 'Lambda',
@@ -311,7 +311,7 @@ function createInteractions(featureResult, config) {
   return config;
 }
 
-async function createNotifications(featureResult, config) {
+async function createNotifications(featureResult, config, configuredAWSClient) {
   if (hasNotifications(featureResult)) {
     const appName = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').name;
     const applicationId = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').arn;
@@ -330,7 +330,7 @@ async function createNotifications(featureResult, config) {
       lastPushTimeStamp: new Date().toISOString(),
     };
     // eslint-disable-next-line max-len
-    config.notifications[appName].output = await createNotificationsOutput(featureResult, channels);
+    config.notifications[appName].output = await createNotificationsOutput(featureResult, channels, configuredAWSClient);
   }
   return config;
 }
@@ -354,7 +354,7 @@ function readJsonFile(jsonFilePath, encoding = 'utf8') {
   return JSON.parse(stripBOM(fs.readFileSync(jsonFilePath, encoding)));
 }
 
-async function createNotificationsOutput(featureResult, channels) {
+async function createNotificationsOutput(featureResult, channels, configuredAWSClient) {
   const output = {
     Name: channels.appName,
     Id: channels.applicationId,
@@ -362,19 +362,19 @@ async function createNotificationsOutput(featureResult, channels) {
   };
   if (channels.GCM) {
     output.FCM = {};
-    output.FCM = await getPinpointChannelDetail({ region: featureResult.region }, 'GCM', channels.applicationId);
+    output.FCM = await getPinpointChannelDetail({ region: featureResult.region }, 'GCM', channels.applicationId, configuredAWSClient);
   }
   if (channels.SMS) {
     output.SMS = {};
-    output.SMS = await getPinpointChannelDetail({ region: featureResult.region }, 'SMS', channels.applicationId);
+    output.SMS = await getPinpointChannelDetail({ region: featureResult.region }, 'SMS', channels.applicationId, configuredAWSClient);
   }
   if (channels.Email) {
     output.Email = {};
-    output.Email = await getPinpointChannelDetail({ region: featureResult.region }, 'Email', channels.applicationId);
+    output.Email = await getPinpointChannelDetail({ region: featureResult.region }, 'Email', channels.applicationId, configuredAWSClient);
   }
   if (channels.APNS) {
     output.APNS = {};
-    output.APNS = await getPinpointChannelDetail({ region: featureResult.region }, 'APNS', channels.applicationId);
+    output.APNS = await getPinpointChannelDetail({ region: featureResult.region }, 'APNS', channels.applicationId, configuredAWSClient);
   }
   return output;
 }
