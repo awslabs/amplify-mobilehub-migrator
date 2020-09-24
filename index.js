@@ -16,5 +16,5 @@ async function handleAmplifyEvent(context, args) {
 
 module.exports = {
   executeAmplifyCommand,
-  handleAmplifyEvent
+  handleAmplifyEvent,
 };

@@ -3,92 +3,99 @@
 const fs = require('fs-extra');
 const ora = require('ora');
 const inquirer = require('inquirer');
-const Mobile = require('../extensions/aws-utils/aws-mobilehub');
-const S3 = require('../extensions/aws-utils/aws-S3');
+const { getLambdaFunctionDetails, getDynamoDbDetails, getPinpointChannelDetail } = require('./import-helper');
+const { updateRegion } = require('./region-updater');
 
 const spinner = ora('');
 
-module.exports = (context) => {
-  context.importProject = async () => {
-    const frontendPlugins = context.amplify.getFrontendPlugins(context);
-    const projectConfigFilePath = context.amplify.pathManager.getProjectConfigFilePath();
-    const projectConfig = JSON.parse(fs.readFileSync(projectConfigFilePath));
-    let projectId;
-    if (!context.parameters.first) {
-      const mobileHub = new Mobile();
-      await mobileHub.init(context);
-      const result = await mobileHub.listProjects();
-      if (result.projects.length === 0) {
-        context.print.error("Nothing to import, you don't have any MobileHub project.");
-        return;
-      }
-      const choices = result.projects.map(project => ({
-        name: `${project.name} (${project.projectId})`,
-        value: project.projectId,
-      }));
-      const answer = await inquirer.prompt([{
-        type: 'list',
-        name: 'projectId',
-        message: 'Select the project to import',
-        choices,
-      }]);
-      projectId = answer.projectId;
-    } else {
-      projectId = context.parameters.first;
-    }
-    try {
-      const providerInfoConfig = context.amplify.pathManager.getProviderInfoFilePath();
-      const providerInfo = JSON.parse(fs.readFileSync(providerInfoConfig));
-      if (Object.keys(providerInfo).length > 1) {
-        context.print.error('Importing a mobile hub project into an amplify project with multiple environments is currently not supported.');
-        return;
-      }
-      spinner.start('Importing your project');
-      const mobileHubResources = await getMobileResources(projectId, context);
-      await persistResourcesToConfig(mobileHubResources, context);
-      const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
-      //Get cloud amplify meta
-      let cloudAmplifyMeta = {};
-      const currentAmplifyMetafilePath = context.amplify.pathManager.getCurrentAmplifyMetaFilePath();
-      if (fs.existsSync(currentAmplifyMetafilePath)) {
-        cloudAmplifyMeta = readJsonFile(currentAmplifyMetafilePath);
-      }
-      frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context), getResourceOutputs(context, cloudAmplifyMeta));
-      await persistResourcesToConfig(mobileHubResources, context);
-      context.updateRegion(frontendHandlerModule);
-      await uploadToS3(context);
-      spinner.succeed('Your Mobile Hub project was successfully imported.');
-    } catch (error) {
-      spinner.fail(`There was an error importing your Mobile Hub project: ${error}`);
-      throw error;
-    }
-  };
-};
 
-async function uploadToS3(context)
-{
-  const amplifyMetaConfig= getAmplifyMetaConfig(context);
+async function importProject(context) {
+  process.env.AWS_SDK_LOAD_CONFIG = true;
+
+  const providerPlugins = context.amplify.getProviderPlugins(context);
+  const provider = require(providerPlugins['awscloudformation']);
+  const { getConfiguredAWSClient } = provider;
+  const awssdk = await getConfiguredAWSClient(context);
+  const configuredAWSClient = await awssdk.configureWithCreds(context);
+
+  const frontendPlugins = context.amplify.getFrontendPlugins(context);
+  const projectConfigFilePath = context.amplify.pathManager.getProjectConfigFilePath();
+  const projectConfig = JSON.parse(fs.readFileSync(projectConfigFilePath));
+  let projectId;
+  if (!context.parameters.first) {
+    const mobileHubClient = new configuredAWSClient.Mobile({ region: 'us-east-1' });
+    const result = await mobileHubClient.listProjects().promise();
+    if (result.projects.length === 0) {
+      context.print.error("Nothing to import, you don't have any MobileHub project.");
+      return;
+    }
+    const choices = result.projects.map(project => ({
+      name: `${project.name} (${project.projectId})`,
+      value: project.projectId,
+    }));
+    const answer = await inquirer.prompt([{
+      type: 'list',
+      name: 'projectId',
+      message: 'Select the project to import',
+      choices,
+    }]);
+    ({ projectId } = answer);
+  } else {
+    projectId = context.parameters.first;
+  }
+  try {
+    const providerInfoConfig = context.amplify.pathManager.getProviderInfoFilePath();
+    const providerInfo = JSON.parse(fs.readFileSync(providerInfoConfig));
+    if (Object.keys(providerInfo).length > 1) {
+      context.print.error('Importing a mobile hub project into an amplify project with multiple environments is currently not supported.');
+      return;
+    }
+    spinner.start('Importing your project');
+    const mobileHubResources = await getMobileResources(projectId, context, configuredAWSClient);
+    await persistResourcesToConfig(mobileHubResources, context);
+    const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
+    // Get cloud amplify meta
+    let cloudAmplifyMeta = {};
+    const currentAmplifyMetafilePath = context.amplify.pathManager.getCurrentAmplifyMetaFilePath();
+    if (fs.existsSync(currentAmplifyMetafilePath)) {
+      cloudAmplifyMeta = readJsonFile(currentAmplifyMetafilePath);
+    }
+    frontendHandlerModule.createFrontendConfigs(context,
+      getResourceOutputs(context),
+      getResourceOutputs(context, cloudAmplifyMeta));
+    await persistResourcesToConfig(mobileHubResources, context);
+    updateRegion(context, frontendHandlerModule);
+    await uploadToS3(context, configuredAWSClient);
+    spinner.succeed('Your Mobile Hub project was successfully imported.');
+  } catch (error) {
+    spinner.fail(`There was an error importing your Mobile Hub project: ${error}`);
+    throw error;
+  }
+}
+
+async function uploadToS3(context, configuredAWSClient) {
+  const amplifyMetaConfig = getAmplifyMetaConfig(context);
   const deploymentBucket = amplifyMetaConfig.providers.awscloudformation.DeploymentBucketName;
-  const s3 = new S3();
-  await s3.init(context);
+  const s3 = new configuredAWSClient.S3({ region: 'us-east-1' });
   const params = {
     Bucket: deploymentBucket,
     Key: 'amplify-meta.json',
     Body: JSON.stringify(amplifyMetaConfig),
   };
-  try{
-    const data = await s3.putObject(params);
+  try {
+    const data = await s3.putObject(params).promise();
     console.log(data);
-  } catch(error)
-  {
+  } catch (error) {
     console.log(error);
   }
 }
 
-async function getMobileResources(projectId, context) {
-  const mobileHub = new Mobile();
-  await mobileHub.init(context);
-  const projectResources = await mobileHub.getProjectResources(projectId);
+async function getMobileResources(projectId, context, configuredAWSClient) {
+  const mobileHubClient = new configuredAWSClient.Mobile({ region: 'us-east-1' });
+  const params = {
+    projectId,
+  };
+  const projectResources = await mobileHubClient.describeProject(params).promise();
   const configuration = await createAmplifyMetaConfig(projectResources, context);
   return configuration;
 }
@@ -162,7 +169,7 @@ function createAuth(featureResult, config) {
   return config;
 }
 
-async function createAnalytics(featureResult, config, context) {
+async function createAnalytics(featureResult, config) {
   const hasAnalytics = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication');
   if (hasAnalytics) {
     config.analytics = {};
@@ -175,7 +182,7 @@ async function createAnalytics(featureResult, config, context) {
         Id: featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').arn,
       },
     };
-    config = await createNotifications(featureResult, config, context);
+    config = await createNotifications(featureResult, config);
   }
   return config;
 }
@@ -197,7 +204,7 @@ function createStorage(featureResult, config) {
   return config;
 }
 
-async function createTables(featureResult, config, context) {
+async function createTables(featureResult, config) {
   const hasDynamoDb = featureResult.find(item => item.type === 'AWS::DynamoDB::Table');
   if (hasDynamoDb) {
     if (!config.storage) {
@@ -215,7 +222,7 @@ async function createTables(featureResult, config, context) {
       },
     };
     // eslint-disable-next-line max-len
-    const tableDetails = await context.getDynamoDbDetails({ region: featureResult.region }, tableName);
+    const tableDetails = await getDynamoDbDetails({ region: featureResult.region }, tableName);
     const partitionKey = tableDetails.Table.KeySchema
       .find(item => item.KeyType === 'HASH').AttributeName;
     const partitionKeyType = tableDetails.Table.AttributeDefinitions
@@ -244,7 +251,7 @@ function createHosting(featureResult, config) {
   return config;
 }
 
-async function createApi(featureResult, config, context) {
+async function createApi(featureResult, config) {
   const hasApi = featureResult.some(item => item.type === 'AWS::ApiGateway::RestApi');
   const hasFunctions = featureResult.some(item => item.type === 'AWS::Lambda::Function');
 
@@ -268,7 +275,7 @@ async function createApi(featureResult, config, context) {
     config.function = {};
     const functionPromises = functions.map(async (element) => {
       // eslint-disable-next-line max-len
-      const functionDetails = await context.getLambdaFunctionDetails({ region: featureResult.region }, element.name);
+      const functionDetails = await getLambdaFunctionDetails({ region: featureResult.region }, element.name);
       if (!element.attributes.status.includes('DELETE_SKIPPED')) {
         config.function[`${element.name}`] = {
           service: 'Lambda',
@@ -304,7 +311,7 @@ function createInteractions(featureResult, config) {
   return config;
 }
 
-async function createNotifications(featureResult, config, context) {
+async function createNotifications(featureResult, config) {
   if (hasNotifications(featureResult)) {
     const appName = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').name;
     const applicationId = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').arn;
@@ -323,7 +330,7 @@ async function createNotifications(featureResult, config, context) {
       lastPushTimeStamp: new Date().toISOString(),
     };
     // eslint-disable-next-line max-len
-    config.notifications[appName].output = await createNotificationsOutput(featureResult, channels, context);
+    config.notifications[appName].output = await createNotificationsOutput(featureResult, channels);
   }
   return config;
 }
@@ -347,7 +354,7 @@ function readJsonFile(jsonFilePath, encoding = 'utf8') {
   return JSON.parse(stripBOM(fs.readFileSync(jsonFilePath, encoding)));
 }
 
-async function createNotificationsOutput(featureResult, channels, context) {
+async function createNotificationsOutput(featureResult, channels) {
   const output = {
     Name: channels.appName,
     Id: channels.applicationId,
@@ -355,19 +362,19 @@ async function createNotificationsOutput(featureResult, channels, context) {
   };
   if (channels.GCM) {
     output.FCM = {};
-    output.FCM = await context.getPinpointChannelDetail({ region: featureResult.region }, 'GCM', channels.applicationId);
+    output.FCM = await getPinpointChannelDetail({ region: featureResult.region }, 'GCM', channels.applicationId);
   }
   if (channels.SMS) {
     output.SMS = {};
-    output.SMS = await context.getPinpointChannelDetail({ region: featureResult.region }, 'SMS', channels.applicationId);
+    output.SMS = await getPinpointChannelDetail({ region: featureResult.region }, 'SMS', channels.applicationId);
   }
   if (channels.Email) {
     output.Email = {};
-    output.Email = await context.getPinpointChannelDetail({ region: featureResult.region }, 'Email', channels.applicationId);
+    output.Email = await getPinpointChannelDetail({ region: featureResult.region }, 'Email', channels.applicationId);
   }
   if (channels.APNS) {
     output.APNS = {};
-    output.APNS = await context.getPinpointChannelDetail({ region: featureResult.region }, 'APNS', channels.applicationId);
+    output.APNS = await getPinpointChannelDetail({ region: featureResult.region }, 'APNS', channels.applicationId);
   }
   return output;
 }
@@ -467,3 +474,7 @@ function getResourceOutputs(context, amplifyMeta) {
     outputsForFrontend,
   };
 }
+
+module.exports = {
+  importProject,
+};

@@ -6,19 +6,17 @@ const cognitoPoolId = 'aws_cognito_identity_pool_id';
 const iosLabel = 'ios';
 const androidLabel = 'android';
 
-module.exports = (context) => {
-  context.updateRegion = async (frontendModule) => {
-    const exportsFilePath = getFilePath(context, frontendModule);
-    if (fs.existsSync(exportsFilePath)) {
-      const configuration = fs.readFileSync(exportsFilePath, 'utf8');
+async function updateRegion(context, frontendModule) {
+  const exportsFilePath = getFilePath(context, frontendModule);
+  if (fs.existsSync(exportsFilePath)) {
+    const configuration = fs.readFileSync(exportsFilePath, 'utf8');
 
-      if (configuration.indexOf(cognitoRegionId) >= 0) {
-        const updatedExportsFile = updateCognitoRegion(configuration, cognitoRegionId);
-        fs.writeFileSync(exportsFilePath, updatedExportsFile, 'utf8');
-      }
+    if (configuration.indexOf(cognitoRegionId) >= 0) {
+      const updatedExportsFile = updateCognitoRegion(configuration, cognitoRegionId);
+      fs.writeFileSync(exportsFilePath, updatedExportsFile, 'utf8');
     }
-  };
-};
+  }
+}
 
 function updateCognitoRegion(configuration, searchKey) {
   let configurations = configuration.split('\n');
@@ -64,3 +62,7 @@ function getFilePath(context, frontendModule) {
   }
   return `${srcDirPath}/${frontendModule.constants[exportsFileName]}`;
 }
+
+module.exports = {
+  updateRegion,
+};
