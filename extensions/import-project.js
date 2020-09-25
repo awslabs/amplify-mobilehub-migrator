@@ -23,34 +23,6 @@ async function importProject(context) {
   const projectConfigFilePath = context.amplify.pathManager.getProjectConfigFilePath();
   const projectConfig = JSON.parse(fs.readFileSync(projectConfigFilePath));
 
-  let projectId;
-
-  if (!context.parameters.first) {
-    const mobileHubClient = new configuredAWSClient.Mobile({ region: 'us-east-1' });
-    const result = await mobileHubClient.listProjects().promise();
-
-    if (result.projects.length === 0) {
-      context.print.error("Nothing to import, you don't have any MobileHub project.");
-      return;
-    }
-
-    const choices = result.projects.map(project => ({
-      name: `${project.name} (${project.projectId})`,
-      value: project.projectId,
-    }));
-
-    const answer = await inquirer.prompt([{
-      type: 'list',
-      name: 'projectId',
-      message: 'Select the project to import',
-      choices,
-    }]);
-
-    ({ projectId } = answer);
-  } else {
-    projectId = context.parameters.first;
-  }
-
   try {
     const providerInfoConfig = context.amplify.pathManager.getProviderInfoFilePath();
     const providerInfo = JSON.parse(fs.readFileSync(providerInfoConfig));
@@ -88,6 +60,34 @@ async function importProject(context) {
     } else {
       context.print.error('The region of the amplify project cannot bet determined from the team-provider-info.json file.');
       return;
+    }
+
+    let projectId;
+
+    if (!context.parameters.first) {
+      const mobileHubClient = new configuredAWSClient.Mobile({ region: 'us-east-1' });
+      const result = await mobileHubClient.listProjects().promise();
+
+      if (result.projects.length === 0) {
+        context.print.error("Nothing to import, you don't have any MobileHub project.");
+        return;
+      }
+
+      const choices = result.projects.map(project => ({
+        name: `${project.name} (${project.projectId})`,
+        value: project.projectId,
+      }));
+
+      const answer = await inquirer.prompt([{
+        type: 'list',
+        name: 'projectId',
+        message: 'Select the project to import',
+        choices,
+      }]);
+
+      ({ projectId } = answer);
+    } else {
+      projectId = context.parameters.first;
     }
 
     spinner.start('Importing your project');
