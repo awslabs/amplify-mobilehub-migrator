@@ -1,99 +1,159 @@
 // Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
+
 const fs = require('fs-extra');
 const ora = require('ora');
 const inquirer = require('inquirer');
-const Mobile = require('../extensions/aws-utils/aws-mobilehub');
-const S3 = require('../extensions/aws-utils/aws-S3');
+const { getLambdaFunctionDetails, getDynamoDbDetails, getPinpointChannelDetail } = require('./import-helper');
+const { updateRegion } = require('./region-updater');
 
 const spinner = ora('');
 
-module.exports = (context) => {
-  context.importProject = async () => {
-    const frontendPlugins = context.amplify.getFrontendPlugins(context);
-    const projectConfigFilePath = context.amplify.pathManager.getProjectConfigFilePath();
-    const projectConfig = JSON.parse(fs.readFileSync(projectConfigFilePath));
+async function importProject(context) {
+  process.env.AWS_SDK_LOAD_CONFIG = true;
+
+  const providerPlugins = context.amplify.getProviderPlugins(context);
+  // eslint-disable-next-line dot-notation
+  const provider = require(providerPlugins['awscloudformation']);
+  const { getConfiguredAWSClient } = provider;
+  const awssdk = await getConfiguredAWSClient(context);
+  const configuredAWSClient = await awssdk.configureWithCreds(context);
+
+  const frontendPlugins = context.amplify.getFrontendPlugins(context);
+  const projectConfigFilePath = context.amplify.pathManager.getProjectConfigFilePath();
+  const projectConfig = JSON.parse(fs.readFileSync(projectConfigFilePath));
+
+  try {
+    const providerInfoConfig = context.amplify.pathManager.getProviderInfoFilePath();
+    const providerInfo = JSON.parse(fs.readFileSync(providerInfoConfig));
+
+    if (Object.keys(providerInfo).length > 1) {
+      context.print.error('Importing a mobile hub project into an amplify project with multiple environments is currently not supported.');
+      return;
+    }
+
+    const currentEnv = providerInfo[Object.keys(providerInfo)[0]];
+    const currentEnvCategories = currentEnv.categories;
+    const hasExistingResources = () => {
+      let result = false;
+
+      if (currentEnvCategories) {
+        Object.keys(currentEnvCategories).forEach((category) => {
+          if (Object.keys(currentEnvCategories[category]).length > 0) {
+            result = true;
+          }
+        });
+      }
+
+      return result;
+    };
+
+    if (hasExistingResources()) {
+      context.print.error('Importing a mobile hub project into an amplify project with existing resources is currently not supported.');
+      return;
+    }
+
+    let amplifyProjectRegion;
+
+    if (currentEnv.awscloudformation && currentEnv.awscloudformation.Region) {
+      amplifyProjectRegion = currentEnv.awscloudformation.Region;
+    } else {
+      context.print.error('The region of the amplify project cannot bet determined from the team-provider-info.json file.');
+      return;
+    }
+
     let projectId;
+
     if (!context.parameters.first) {
-      const mobileHub = new Mobile();
-      await mobileHub.init(context);
-      const result = await mobileHub.listProjects();
+      const mobileHubClient = new configuredAWSClient.Mobile({ region: 'us-east-1' });
+      const result = await mobileHubClient.listProjects().promise();
+
       if (result.projects.length === 0) {
         context.print.error("Nothing to import, you don't have any MobileHub project.");
         return;
       }
+
       const choices = result.projects.map(project => ({
         name: `${project.name} (${project.projectId})`,
         value: project.projectId,
       }));
+
       const answer = await inquirer.prompt([{
         type: 'list',
         name: 'projectId',
         message: 'Select the project to import',
         choices,
       }]);
-      projectId = answer.projectId;
+
+      ({ projectId } = answer);
     } else {
       projectId = context.parameters.first;
     }
-    try {
-      const providerInfoConfig = context.amplify.pathManager.getProviderInfoFilePath();
-      const providerInfo = JSON.parse(fs.readFileSync(providerInfoConfig));
-      if (Object.keys(providerInfo).length > 1) {
-        context.print.error('Importing a mobile hub project into an amplify project with multiple environments is currently not supported.');
-        return;
-      }
-      spinner.start('Importing your project');
-      const mobileHubResources = await getMobileResources(projectId, context);
-      await persistResourcesToConfig(mobileHubResources, context);
-      const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
-      //Get cloud amplify meta
-      let cloudAmplifyMeta = {};
-      const currentAmplifyMetafilePath = context.amplify.pathManager.getCurrentAmplifyMetaFilePath();
-      if (fs.existsSync(currentAmplifyMetafilePath)) {
-        cloudAmplifyMeta = readJsonFile(currentAmplifyMetafilePath);
-      }
-      frontendHandlerModule.createFrontendConfigs(context, getResourceOutputs(context), getResourceOutputs(context, cloudAmplifyMeta));
-      await persistResourcesToConfig(mobileHubResources, context);
-      context.updateRegion(frontendHandlerModule);
-      await uploadToS3(context);
-      spinner.succeed('Your Mobile Hub project was successfully imported.');
-    } catch (error) {
-      spinner.fail(`There was an error importing your Mobile Hub project: ${error}`);
-      throw error;
-    }
-  };
-};
 
-async function uploadToS3(context)
-{
-  const amplifyMetaConfig= getAmplifyMetaConfig(context);
+    spinner.start('Importing your project');
+
+    const mobileHubClient = new configuredAWSClient.Mobile({ region: 'us-east-1' });
+    const params = {
+      projectId,
+    };
+
+    const projectResources = await mobileHubClient.describeProject(params).promise();
+
+    if (projectResources.details.region !== amplifyProjectRegion) {
+      context.print.error(`Mobile hub project region '${projectResources.details.region}' and amplify project region: '${amplifyProjectRegion}' must be the same. Importing from different regions is currently not supported.`);
+      return;
+    }
+
+    const mobileHubResources = await createAmplifyMetaConfig(projectResources, configuredAWSClient);
+
+    await persistResourcesToConfig(mobileHubResources, context);
+
+    const frontendHandlerModule = require(frontendPlugins[projectConfig.frontend]);
+
+    // Get cloud amplify meta
+    let cloudAmplifyMeta = {};
+    const currentAmplifyMetafilePath = context.amplify.pathManager.getCurrentAmplifyMetaFilePath();
+
+    if (fs.existsSync(currentAmplifyMetafilePath)) {
+      cloudAmplifyMeta = readJsonFile(currentAmplifyMetafilePath);
+    }
+
+    frontendHandlerModule.createFrontendConfigs(context,
+      getResourceOutputs(context),
+      getResourceOutputs(context, cloudAmplifyMeta));
+
+    await persistResourcesToConfig(mobileHubResources, context);
+
+    updateRegion(context, frontendHandlerModule);
+
+    await uploadToS3(context, configuredAWSClient);
+
+    spinner.succeed('Your Mobile Hub project was successfully imported.');
+  } catch (error) {
+    spinner.fail(`There was an error importing your Mobile Hub project: ${error}`);
+    throw error;
+  }
+}
+
+async function uploadToS3(context, configuredAWSClient) {
+  const amplifyMetaConfig = getAmplifyMetaConfig(context);
   const deploymentBucket = amplifyMetaConfig.providers.awscloudformation.DeploymentBucketName;
-  const s3 = new S3();
-  await s3.init(context);
+  const s3 = new configuredAWSClient.S3({ region: 'us-east-1' });
   const params = {
     Bucket: deploymentBucket,
     Key: 'amplify-meta.json',
     Body: JSON.stringify(amplifyMetaConfig),
   };
-  try{
-    const data = await s3.putObject(params);
+
+  try {
+    const data = await s3.putObject(params).promise();
     console.log(data);
-  } catch(error)
-  {
-    console.log(error);
+  } catch (error) {
+    console.log(`There was an error while uploading '${params.Key}' to S3: ${error}`);
   }
 }
 
-async function getMobileResources(projectId, context) {
-  const mobileHub = new Mobile();
-  await mobileHub.init(context);
-  const projectResources = await mobileHub.getProjectResources(projectId);
-  const configuration = await createAmplifyMetaConfig(projectResources, context);
-  return configuration;
-}
-
-async function createAmplifyMetaConfig(mobileHubResources, context) {
+async function createAmplifyMetaConfig(mobileHubResources, configuredAWSClient) {
   const mobileHubAmplifyMap = {
     'user-signin': 'auth',
     analytics: 'analytics',
@@ -103,37 +163,41 @@ async function createAmplifyMetaConfig(mobileHubResources, context) {
     'cloud-api': 'api',
     bots: 'interactions',
   };
-  let config = { env: false };
+  let config = {};
+
   const featurePromises = Object.keys(mobileHubAmplifyMap).map(async (mobileHubCategory) => {
-    // eslint-disable-next-line max-len
-    const featureResult = mobileHubResources.details.resources.filter(resource => resource.feature === mobileHubCategory);
+    const featureResult = mobileHubResources.details.resources
+      .filter(resource => resource.feature === mobileHubCategory);
     featureResult.region = mobileHubResources.details.region;
+
     if (featureResult) {
       // eslint-disable-next-line max-len
-      config = await buildCategory(featureResult, mobileHubAmplifyMap, mobileHubCategory, config, context);
+      config = await buildCategory(featureResult, mobileHubAmplifyMap, mobileHubCategory, config, configuredAWSClient);
     }
   });
+
   await Promise.all(featurePromises);
+
   return config;
 }
 
-
-// eslint-disable-next-line max-len
-async function buildCategory(featureResult, mobileHubAmplifyMap, mobileHubCategory, config, context) {
+async function buildCategory(featureResult, mobileHubAmplifyMap, mobileHubCategory,
+  config, configuredAWSClient) {
   const amplifyCategory = mobileHubAmplifyMap[mobileHubCategory];
+
   switch (amplifyCategory) {
     case 'auth':
       return createAuth(featureResult, config);
     case 'analytics':
-      return await createAnalytics(featureResult, config, context);
+      return await createAnalytics(featureResult, config, configuredAWSClient);
     case 'storage':
-      return createStorage(featureResult, config, context);
+      return createStorage(featureResult, config);
     case 'database':
-      return await createTables(featureResult, config, context);
+      return await createTables(featureResult, config, configuredAWSClient);
     case 'api':
-      return await createApi(featureResult, config, context);
+      return await createApi(featureResult, config, configuredAWSClient);
     case 'interactions':
-      return createInteractions(featureResult, config, context);
+      return createInteractions(featureResult, config);
     default:
       return config;
   }
@@ -141,7 +205,7 @@ async function buildCategory(featureResult, mobileHubAmplifyMap, mobileHubCatego
 
 function createAuth(featureResult, config) {
   const hasAuth = featureResult.find(item => item.type === 'AWS::Cognito::IdentityPool')
-  && featureResult.find(item => item.type === 'AWS::Cognito::UserPool');
+    && featureResult.find(item => item.type === 'AWS::Cognito::UserPool');
 
   if (hasAuth) {
     config.auth = {};
@@ -159,11 +223,13 @@ function createAuth(featureResult, config) {
       },
     };
   }
+
   return config;
 }
 
-async function createAnalytics(featureResult, config, context) {
+async function createAnalytics(featureResult, config, configuredAWSClient) {
   const hasAnalytics = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication');
+
   if (hasAnalytics) {
     config.analytics = {};
     config.analytics[`analytics${new Date().getMilliseconds()}`] = {
@@ -175,13 +241,16 @@ async function createAnalytics(featureResult, config, context) {
         Id: featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').arn,
       },
     };
-    config = await createNotifications(featureResult, config, context);
+
+    config = await createNotifications(featureResult, config, configuredAWSClient);
   }
+
   return config;
 }
 
 function createStorage(featureResult, config) {
   const hasS3 = featureResult.find(item => item.type === 'AWS::S3::Bucket' && item.feature === 'user-data');
+
   if (hasS3) {
     config.storage = {};
     config.storage[`s3${new Date().getMilliseconds()}`] = {
@@ -193,18 +262,23 @@ function createStorage(featureResult, config) {
       },
     };
   }
+
   config = createHosting(featureResult, config);
+
   return config;
 }
 
-async function createTables(featureResult, config, context) {
+async function createTables(featureResult, config, configuredAWSClient) {
   const hasDynamoDb = featureResult.find(item => item.type === 'AWS::DynamoDB::Table');
+
   if (hasDynamoDb) {
     if (!config.storage) {
       config.storage = {};
     }
+
     const tableName = featureResult.find(item => item.type === 'AWS::DynamoDB::Table').name;
     const serviceName = `dynamo${new Date().getMilliseconds()}`;
+
     config.storage[serviceName] = {
       service: 'DynamoDb',
       lastPushTimeStamp: new Date().toISOString(),
@@ -214,20 +288,24 @@ async function createTables(featureResult, config, context) {
         Name: tableName,
       },
     };
-    // eslint-disable-next-line max-len
-    const tableDetails = await context.getDynamoDbDetails({ region: featureResult.region }, tableName);
+
+    const tableDetails = await getDynamoDbDetails({ region: featureResult.region }, tableName,
+      configuredAWSClient);
     const partitionKey = tableDetails.Table.KeySchema
       .find(item => item.KeyType === 'HASH').AttributeName;
     const partitionKeyType = tableDetails.Table.AttributeDefinitions
       .find(item => item.AttributeName === partitionKey).AttributeType;
+
     config.storage[serviceName].output.PartitionKeyName = partitionKey;
     config.storage[serviceName].output.PartitionKeyType = partitionKeyType;
   }
+
   return config;
 }
 
 function createHosting(featureResult, config) {
   const hasHosting = featureResult.find(item => item.type === 'AWS::S3::Bucket' && item.feature === 'hosting');
+
   if (hasHosting) {
     config.hosting = {};
     config.hosting.S3AndCloudFront = {
@@ -241,10 +319,11 @@ function createHosting(featureResult, config) {
       },
     };
   }
+
   return config;
 }
 
-async function createApi(featureResult, config, context) {
+async function createApi(featureResult, config, configuredAWSClient) {
   const hasApi = featureResult.some(item => item.type === 'AWS::ApiGateway::RestApi');
   const hasFunctions = featureResult.some(item => item.type === 'AWS::Lambda::Function');
 
@@ -252,8 +331,9 @@ async function createApi(featureResult, config, context) {
     config.api = {};
     // eslint-disable-next-line dot-notation
     const physicalId = featureResult.find(item => item.type === 'AWS::ApiGateway::RestApi').attributes['cfPhysicalID'];
-    // eslint-disable-next-line prefer-destructuring
+    // eslint-disable-next-line prefer-destructuring, dot-notation
     const region = featureResult.find(item => item.type === 'AWS::ApiGateway::RestApi').attributes['region'];
+
     config.api[`api${new Date().getMilliseconds()}`] = {
       service: 'API Gateway',
       lastPushTimeStamp: new Date().toISOString(),
@@ -263,12 +343,14 @@ async function createApi(featureResult, config, context) {
       },
     };
   }
+
   if (hasFunctions) {
-    const functions = featureResult.filter(item => item.type === 'AWS::Lambda::Function');
     config.function = {};
+    const functions = featureResult.filter(item => item.type === 'AWS::Lambda::Function');
     const functionPromises = functions.map(async (element) => {
       // eslint-disable-next-line max-len
-      const functionDetails = await context.getLambdaFunctionDetails({ region: featureResult.region }, element.name);
+      const functionDetails = await getLambdaFunctionDetails({ region: featureResult.region }, element.name, configuredAWSClient);
+
       if (!element.attributes.status.includes('DELETE_SKIPPED')) {
         config.function[`${element.name}`] = {
           service: 'Lambda',
@@ -282,13 +364,16 @@ async function createApi(featureResult, config, context) {
         };
       }
     });
+
     await Promise.all(functionPromises);
   }
+
   return config;
 }
 
 function createInteractions(featureResult, config) {
   const hasBots = featureResult.some(item => item.type === 'AWS::Lex::Bot');
+
   if (hasBots) {
     config.interactions = {};
     config.interactions[`lex${new Date().getMilliseconds()}`] = {
@@ -301,10 +386,11 @@ function createInteractions(featureResult, config) {
       },
     };
   }
+
   return config;
 }
 
-async function createNotifications(featureResult, config, context) {
+async function createNotifications(featureResult, config, configuredAWSClient) {
   if (hasNotifications(featureResult)) {
     const appName = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').name;
     const applicationId = featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').arn;
@@ -323,10 +409,12 @@ async function createNotifications(featureResult, config, context) {
       lastPushTimeStamp: new Date().toISOString(),
     };
     // eslint-disable-next-line max-len
-    config.notifications[appName].output = await createNotificationsOutput(featureResult, channels, context);
+    config.notifications[appName].output = await createNotificationsOutput(featureResult, channels, configuredAWSClient);
   }
+
   return config;
 }
+
 function hasNotifications(featureResult) {
   return featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication')
   && (featureResult.find(item => item.type === 'AWS::Pinpoint::EmailChannel')
@@ -340,6 +428,7 @@ function stripBOM(content) {
   if (content.charCodeAt(0) === 0xFEFF) {
     content = content.slice(1);
   }
+
   return content;
 }
 
@@ -347,28 +436,33 @@ function readJsonFile(jsonFilePath, encoding = 'utf8') {
   return JSON.parse(stripBOM(fs.readFileSync(jsonFilePath, encoding)));
 }
 
-async function createNotificationsOutput(featureResult, channels, context) {
+async function createNotificationsOutput(featureResult, channels, configuredAWSClient) {
   const output = {
     Name: channels.appName,
     Id: channels.applicationId,
     Region: featureResult.region,
   };
+
   if (channels.GCM) {
     output.FCM = {};
-    output.FCM = await context.getPinpointChannelDetail({ region: featureResult.region }, 'GCM', channels.applicationId);
+    output.FCM = await getPinpointChannelDetail({ region: featureResult.region }, 'GCM', channels.applicationId, configuredAWSClient);
   }
+
   if (channels.SMS) {
     output.SMS = {};
-    output.SMS = await context.getPinpointChannelDetail({ region: featureResult.region }, 'SMS', channels.applicationId);
+    output.SMS = await getPinpointChannelDetail({ region: featureResult.region }, 'SMS', channels.applicationId, configuredAWSClient);
   }
+
   if (channels.Email) {
     output.Email = {};
-    output.Email = await context.getPinpointChannelDetail({ region: featureResult.region }, 'Email', channels.applicationId);
+    output.Email = await getPinpointChannelDetail({ region: featureResult.region }, 'Email', channels.applicationId, configuredAWSClient);
   }
+
   if (channels.APNS) {
     output.APNS = {};
-    output.APNS = await context.getPinpointChannelDetail({ region: featureResult.region }, 'APNS', channels.applicationId);
+    output.APNS = await getPinpointChannelDetail({ region: featureResult.region }, 'APNS', channels.applicationId, configuredAWSClient);
   }
+
   return output;
 }
 
@@ -376,6 +470,7 @@ async function persistResourcesToConfig(mobileHubResources, context) {
   if (mobileHubResources) {
     const amplifyMetaConfig = getAmplifyMetaConfig(context);
     const mergedBackendConfig = mergeConfig(amplifyMetaConfig, mobileHubResources);
+
     persistToFile(mergedBackendConfig, context.amplify.pathManager.getAmplifyMetaFilePath());
     persistToFile(mergedBackendConfig, context.amplify.pathManager.getCurrentAmplifyMetaFilePath());
   }
@@ -383,12 +478,14 @@ async function persistResourcesToConfig(mobileHubResources, context) {
 
 function persistToFile(mergedBackendConfig, filePath) {
   const amplifyMetaFilePath = filePath;
-  const jsonString = JSON.stringify(mergedBackendConfig, null, 4);
+  const jsonString = JSON.stringify(mergedBackendConfig, null, 2);
+
   fs.writeFileSync(amplifyMetaFilePath, jsonString, 'utf8');
 }
 
 function getAmplifyMetaConfig(context) {
   const amplifyMetaConfig = context.amplify.pathManager.getAmplifyMetaFilePath();
+
   return JSON.parse(fs.readFileSync(amplifyMetaConfig));
 }
 
@@ -398,12 +495,14 @@ function mergeConfig(amplifyMetaConfig, mobilehubResources) {
       amplifyMetaConfig[category] = mobilehubResources[category];
     });
   }
+
   return amplifyMetaConfig;
 }
 
 function getResourceOutputs(context, amplifyMeta) {
   if (!amplifyMeta) {
     const amplifyMetaFilePath = context.amplify.pathManager.getAmplifyMetaFilePath();
+
     amplifyMeta = JSON.parse(fs.readFileSync(amplifyMetaFilePath));
   }
 
@@ -423,27 +522,31 @@ function getResourceOutputs(context, amplifyMeta) {
 
   Object.keys(amplifyMeta).forEach((category) => {
     const categoryMeta = amplifyMeta[category];
+
     Object.keys(categoryMeta).forEach((resourceName) => {
       const resourceMeta = categoryMeta[resourceName];
+
       if (resourceMeta.output) {
-        const {
-          providerPlugin,
-        } = resourceMeta;
+        const { providerPlugin } = resourceMeta;
+
         if (!outputsByProvider[providerPlugin]) {
           outputsByProvider[providerPlugin] = {
             metadata: {},
             serviceResourceMapping: {},
           };
         }
+
         if (!outputsByProvider[providerPlugin].serviceResourceMapping[resourceMeta.service]) {
           outputsByProvider[providerPlugin].serviceResourceMapping[resourceMeta.service] = [];
         }
-        /*eslint-disable*/
-            outputsByProvider[providerPlugin].serviceResourceMapping[resourceMeta.service].push(resourceMeta);
-            /* eslint-enable */
+
+        // eslint-disable-next-line max-len
+        outputsByProvider[providerPlugin].serviceResourceMapping[resourceMeta.service].push(resourceMeta);
+
         if (!outputsByCategory[category]) {
           outputsByCategory[category] = {};
         }
+
         if (resourceMeta.service) {
           resourceMeta.output.service = resourceMeta.service;
         }
@@ -453,6 +556,7 @@ function getResourceOutputs(context, amplifyMeta) {
         if (!outputsForFrontend.serviceResourceMapping[resourceMeta.service]) {
           outputsForFrontend.serviceResourceMapping[resourceMeta.service] = [];
         }
+
         outputsForFrontend.serviceResourceMapping[resourceMeta.service].push(resourceMeta);
       }
     });
@@ -461,9 +565,14 @@ function getResourceOutputs(context, amplifyMeta) {
   if (outputsByProvider.awscloudformation) {
     outputsForFrontend.metadata = outputsByProvider.awscloudformation.metadata;
   }
+
   return {
     outputsByProvider,
     outputsByCategory,
     outputsForFrontend,
   };
 }
+
+module.exports = {
+  importProject,
+};

@@ -1,6 +1,6 @@
 {
   "name": "amplify-mobilehub-migrator",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "description": "A plugin for the AWS Amplify CLI that supports migrating Mobile Hub project resources to be used with the Amplify CLI",
   "author": "Amazon Web Services",
   "license": "Apache-2.0",
@@ -11,18 +11,10 @@
     "aws"
   ],
   "dependencies": {
-    "acorn": "^6.0.0",
-    "ajv": "^5.0.0",
-    "amplify-frontend-android": "^2.13.2",
-    "amplify-frontend-ios": "^2.13.2",
-    "amplify-frontend-javascript": "^2.14.1",
-    "amplify-provider-awscloudformation": "^4.14.1",
-    "aws-sdk": "2.410.0",
-    "fs-extra": "^7.0.0",
-    "graphql": "^0.11.0",
-    "inquirer": "^6.2.2",
-    "ora": "^3.0.0",
-    "path": "^0.12.7"
+    "aws-sdk": "2.608.0",
+    "fs-extra": "^8.1.0",
+    "inquirer": "^7.3.3",
+    "ora": "^4.0.3"
   },
   "devDependencies": {
     "eslint": "^5.14.1",

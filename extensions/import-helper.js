@@ -1,55 +1,60 @@
 // Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-const { getConfiguredAWSClient } = require('amplify-provider-awscloudformation');
 
-module.exports = (context) => {
-  context.getLambdaFunctionDetails = async (options, name) => {
-    const awsOptions = {};
-    if (options.region) {
-      awsOptions.region = options.region;
-    }
-    const lambda = await getConfiguredLambdaClient(context, awsOptions);
-    const result = await lambda.getFunction({ FunctionName: name }).promise();
-    return result;
-  };
-  context.getDynamoDbDetails = async (options, name) => {
-    const awsOptions = {};
-    if (options.region) {
-      awsOptions.region = options.region;
-    }
-    const dynamoDb = await getConfiguredDynamoDbClient(context, awsOptions);
-    const result = await dynamoDb.describeTable({ TableName: name }).promise();
-    return result;
-  };
-  context.getPinpointChannelDetail = async (options, channel, applicationId) => {
-    const awsOptions = {};
-    if (options.region) {
-      awsOptions.region = options.region;
-    }
-    const pinpoint = await getConfiguredPinpointClient(context, awsOptions);
-    if (channel === 'SMS') {
-      return await pinpoint.getSmsChannel({ ApplicationId: applicationId }).promise();
-    }
-    if (channel === 'Email') {
-      return await pinpoint.getEmailChannel({ ApplicationId: applicationId }).promise();
-    }
-    if (channel === 'GCM') {
-      return await pinpoint.getGcmChannel({ ApplicationId: applicationId }).promise();
-    }
-    if (channel === 'APNS') {
-      return await pinpoint.getApnsChannel({ ApplicationId: applicationId }).promise();
-    }
-  };
+async function getLambdaFunctionDetails(options, name, configuredAWSClient) {
+  const awsOptions = {};
+
+  if (options && options.region) {
+    awsOptions.region = options.region;
+  }
+
+  const lambda = new configuredAWSClient.Lambda({ region: awsOptions.region });
+  const result = await lambda.getFunction({ FunctionName: name }).promise();
+
+  return result;
+}
+
+async function getDynamoDbDetails(options, name, configuredAWSClient) {
+  const awsOptions = {};
+
+  if (options && options.region) {
+    awsOptions.region = options.region;
+  }
+
+  const dynamoDb = new configuredAWSClient.DynamoDB({ region: awsOptions.region });
+  const result = await dynamoDb.describeTable({ TableName: name }).promise();
+
+  return result;
+}
+
+async function getPinpointChannelDetail(options, channel, applicationId, configuredAWSClient) {
+  const awsOptions = {};
+
+  if (options.region) {
+    awsOptions.region = options.region;
+  }
+
+  const pinpoint = new configuredAWSClient.Pinpoint({ region: awsOptions.region });
+
+  if (channel === 'SMS') {
+    return await pinpoint.getSmsChannel({ ApplicationId: applicationId }).promise();
+  }
+
+  if (channel === 'Email') {
+    return await pinpoint.getEmailChannel({ ApplicationId: applicationId }).promise();
+  }
+
+  if (channel === 'GCM') {
+    return await pinpoint.getGcmChannel({ ApplicationId: applicationId }).promise();
+  }
+
+  if (channel === 'APNS') {
+    return await pinpoint.getApnsChannel({ ApplicationId: applicationId }).promise();
+  }
+}
+
+module.exports = {
+  getLambdaFunctionDetails,
+  getDynamoDbDetails,
+  getPinpointChannelDetail,
 };
-async function getConfiguredLambdaClient(context, awsOptions) {
-  const awsClient = await getConfiguredAWSClient(context);
-  return new awsClient.Lambda({ region: awsOptions.region });
-}
-async function getConfiguredDynamoDbClient(context, awsOptions) {
-  const awsClient = await getConfiguredAWSClient(context);
-  return new awsClient.DynamoDB({ region: awsOptions.region });
-}
-async function getConfiguredPinpointClient(context, awsOptions) {
-  const awsClient = await getConfiguredAWSClient(context);
-  return new awsClient.Pinpoint({ region: awsOptions.region });
-}
