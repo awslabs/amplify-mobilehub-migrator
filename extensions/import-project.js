@@ -211,6 +211,7 @@ function createAuth(featureResult, config) {
     config.auth = {};
     config.auth[`cognito${new Date().getMilliseconds()}`] = {
       service: 'Cognito',
+      mobileHubMigrated: true,
       lastPushTimeStamp: new Date().toISOString(),
       output: {
         IdentityPoolId: featureResult.find(item => item.type === 'AWS::Cognito::IdentityPool').attributes.poolid,
@@ -234,6 +235,7 @@ async function createAnalytics(featureResult, config, configuredAWSClient) {
     config.analytics = {};
     config.analytics[`analytics${new Date().getMilliseconds()}`] = {
       service: 'Pinpoint',
+      mobileHubMigrated: true,
       lastPushTimeStamp: new Date().toISOString(),
       output: {
         appName: featureResult.find(item => item.type === 'AWS::Pinpoint::AnalyticsApplication').name,
@@ -255,6 +257,7 @@ function createStorage(featureResult, config) {
     config.storage = {};
     config.storage[`s3${new Date().getMilliseconds()}`] = {
       service: 'S3',
+      mobileHubMigrated: true,
       lastPushTimeStamp: new Date().toISOString(),
       output: {
         BucketName: featureResult.find(item => item.type === 'AWS::S3::Bucket').name,
@@ -281,6 +284,7 @@ async function createTables(featureResult, config, configuredAWSClient) {
 
     config.storage[serviceName] = {
       service: 'DynamoDb',
+      mobileHubMigrated: true,
       lastPushTimeStamp: new Date().toISOString(),
       output: {
         Region: featureResult.region,
@@ -310,6 +314,7 @@ function createHosting(featureResult, config) {
     config.hosting = {};
     config.hosting.S3AndCloudFront = {
       service: 'S3AndCloudFront',
+      mobileHubMigrated: true,
       lastPushTimeStamp: new Date().toISOString(),
       output: {
         S3BucketSecureURL: featureResult.find(item => item.type === 'AWS::S3::Bucket').attributes['s3-bucket-console-url'],
@@ -336,6 +341,7 @@ async function createApi(featureResult, config, configuredAWSClient) {
 
     config.api[`api${new Date().getMilliseconds()}`] = {
       service: 'API Gateway',
+      mobileHubMigrated: true,
       lastPushTimeStamp: new Date().toISOString(),
       output: {
         ApiName: featureResult.find(item => item.type === 'AWS::ApiGateway::RestApi').name,
@@ -354,6 +360,7 @@ async function createApi(featureResult, config, configuredAWSClient) {
       if (!element.attributes.status.includes('DELETE_SKIPPED')) {
         config.function[`${element.name}`] = {
           service: 'Lambda',
+          mobileHubMigrated: true,
           lastPushTimeStamp: new Date().toISOString(),
           build: true,
           output: {
@@ -378,6 +385,7 @@ function createInteractions(featureResult, config) {
     config.interactions = {};
     config.interactions[`lex${new Date().getMilliseconds()}`] = {
       service: 'Lex',
+      mobileHubMigrated: true,
       lastPushTimeStamp: new Date().toISOString(),
       output: {
         FunctionArn: featureResult.find(item => item.type === 'AWS::Lex::Bot').arn,
@@ -406,6 +414,7 @@ async function createNotifications(featureResult, config, configuredAWSClient) {
     config.notifications = {};
     config.notifications[`${appName}`] = {
       service: 'Pinpoint',
+      mobileHubMigrated: true,
       lastPushTimeStamp: new Date().toISOString(),
     };
     // eslint-disable-next-line max-len
