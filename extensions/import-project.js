@@ -98,7 +98,7 @@ async function importProject(context) {
     };
 
     const projectResources = await mobileHubClient.describeProject(params).promise();
-
+    
     if (projectResources.details.region !== amplifyProjectRegion) {
       context.print.error(`Mobile hub project region '${projectResources.details.region}' and amplify project region: '${amplifyProjectRegion}' must be the same. Importing from different regions is currently not supported.`);
       return;
@@ -252,18 +252,22 @@ async function createAnalytics(featureResult, config, configuredAWSClient) {
 
 function createStorage(featureResult, config) {
   const hasS3 = featureResult.find(item => item.type === 'AWS::S3::Bucket' && item.feature === 'user-data');
+  const buckets = featureResult.find(item => item.type === 'AWS::S3::Bucket');
 
   if (hasS3) {
     config.storage = {};
-    config.storage[`s3${new Date().getMilliseconds()}`] = {
-      service: 'S3',
-      mobileHubMigrated: true,
-      lastPushTimeStamp: new Date().toISOString(),
-      output: {
-        BucketName: featureResult.find(item => item.type === 'AWS::S3::Bucket').name,
-        Region: featureResult.find(item => item.type === 'AWS::S3::Bucket').attributes.region,
-      },
-    };
+    buckets.map((bucket) => {
+      const prefix = bucket.name.substr(0,4);
+      config.storage[`s3-${prefix}-${new Date().getMilliseconds()}`] = {
+        service: 'S3',
+        mobileHubMigrated: true,
+        lastPushTimeStamp: new Date().toISOString(),
+        output: {
+          BucketName: bucket.name,
+          Region: bucket.attributes.region,
+        },
+      };
+    });  
   }
 
   config = createHosting(featureResult, config);
@@ -279,29 +283,36 @@ async function createTables(featureResult, config, configuredAWSClient) {
       config.storage = {};
     }
 
-    const tableName = featureResult.find(item => item.type === 'AWS::DynamoDB::Table').name;
-    const serviceName = `dynamo${new Date().getMilliseconds()}`;
+    const tables = featureResult.filter(item => item.type === 'AWS::DynamoDB::Table');
+    const tablePromises = tables.map(async (table) => {
+      const tableName = table.name;
+      const prefix = tableName.substr(0,4);
+      const serviceName = `dynamo-${prefix}-${new Date().getMilliseconds()}`;
+  
+      config.storage[serviceName] = {
+        service: 'DynamoDb',
+        mobileHubMigrated: true,
+        lastPushTimeStamp: new Date().toISOString(),
+        output: {
+          Region: featureResult.region,
+          Arn: table.arn,
+          Name: tableName,
+        },
+      };
+  
+      const tableDetails = await getDynamoDbDetails({ region: featureResult.region }, tableName,
+        configuredAWSClient);
+      const partitionKey = tableDetails.Table.KeySchema
+        .find(item => item.KeyType === 'HASH').AttributeName;
+      const partitionKeyType = tableDetails.Table.AttributeDefinitions
+        .find(item => item.AttributeName === partitionKey).AttributeType;
+  
+      config.storage[serviceName].output.PartitionKeyName = partitionKey;
+      config.storage[serviceName].output.PartitionKeyType = partitionKeyType;
+    });
 
-    config.storage[serviceName] = {
-      service: 'DynamoDb',
-      mobileHubMigrated: true,
-      lastPushTimeStamp: new Date().toISOString(),
-      output: {
-        Region: featureResult.region,
-        Arn: featureResult.find(item => item.type === 'AWS::DynamoDB::Table').arn,
-        Name: tableName,
-      },
-    };
-
-    const tableDetails = await getDynamoDbDetails({ region: featureResult.region }, tableName,
-      configuredAWSClient);
-    const partitionKey = tableDetails.Table.KeySchema
-      .find(item => item.KeyType === 'HASH').AttributeName;
-    const partitionKeyType = tableDetails.Table.AttributeDefinitions
-      .find(item => item.AttributeName === partitionKey).AttributeType;
-
-    config.storage[serviceName].output.PartitionKeyName = partitionKey;
-    config.storage[serviceName].output.PartitionKeyType = partitionKeyType;
+    await Promise.all(tablePromises);
+    
   }
 
   return config;
@@ -334,20 +345,24 @@ async function createApi(featureResult, config, configuredAWSClient) {
 
   if (hasApi) {
     config.api = {};
-    // eslint-disable-next-line dot-notation
-    const physicalId = featureResult.find(item => item.type === 'AWS::ApiGateway::RestApi').attributes['cfPhysicalID'];
-    // eslint-disable-next-line prefer-destructuring, dot-notation
-    const region = featureResult.find(item => item.type === 'AWS::ApiGateway::RestApi').attributes['region'];
+    const apis = featureResult.filter(item => item.type === 'AWS::ApiGateway::RestApi');
 
-    config.api[`api${new Date().getMilliseconds()}`] = {
+    apis.map((api) => {
+    // eslint-disable-next-line dot-notation
+    const physicalId = api.attributes['cfPhysicalID'];
+    // eslint-disable-next-line prefer-destructuring, dot-notation
+    const region = api.attributes['region'];
+    const prefix = api.name.substr(0,4);
+    config.api[`api-${prefix}-${new Date().getMilliseconds()}`] = {
       service: 'API Gateway',
       mobileHubMigrated: true,
       lastPushTimeStamp: new Date().toISOString(),
       output: {
-        ApiName: featureResult.find(item => item.type === 'AWS::ApiGateway::RestApi').name,
+        ApiName: api.name,
         RootUrl: `https://${physicalId}.execute-api.${region}.amazonaws.com/Development`,
       },
     };
+    });
   }
 
   if (hasFunctions) {
@@ -380,19 +395,23 @@ async function createApi(featureResult, config, configuredAWSClient) {
 
 function createInteractions(featureResult, config) {
   const hasBots = featureResult.some(item => item.type === 'AWS::Lex::Bot');
+  const bots = featureResult.filter(item => item.type === 'AWS::Lex::Bot');
 
   if (hasBots) {
     config.interactions = {};
-    config.interactions[`lex${new Date().getMilliseconds()}`] = {
-      service: 'Lex',
-      mobileHubMigrated: true,
-      lastPushTimeStamp: new Date().toISOString(),
-      output: {
-        FunctionArn: featureResult.find(item => item.type === 'AWS::Lex::Bot').arn,
-        Region: featureResult.find(item => item.type === 'AWS::Lex::Bot').attributes.region,
-        BotName: featureResult.find(item => item.type === 'AWS::Lex::Bot').name,
-      },
-    };
+    bots.map((item) => {
+      const prefix = item.name.substr(0,4);
+      config.interactions[`lex-${prefix}-${new Date().getMilliseconds()}`] = {
+        service: 'Lex',
+        mobileHubMigrated: true,
+        lastPushTimeStamp: new Date().toISOString(),
+        output: {
+          FunctionArn: item.arn,
+          Region: item.attributes.region,
+          BotName: item.name,
+        },
+      };
+    });
   }
 
   return config;
