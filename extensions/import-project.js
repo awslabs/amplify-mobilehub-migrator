@@ -252,7 +252,7 @@ async function createAnalytics(featureResult, config, configuredAWSClient) {
 
 function createStorage(featureResult, config) {
   const hasS3 = featureResult.find(item => item.type === 'AWS::S3::Bucket' && item.feature === 'user-data');
-  const buckets = featureResult.find(item => item.type === 'AWS::S3::Bucket');
+  const buckets = featureResult.filter(item => item.type === 'AWS::S3::Bucket');
 
   if (hasS3) {
     config.storage = {};
